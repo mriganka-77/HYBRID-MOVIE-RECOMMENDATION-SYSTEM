@@ -5,6 +5,7 @@
   "private": true,
   "main": "server.js",
   "scripts": {
+    "build": "mkdir -p build && cp -r index.html assets build/ 2>/dev/null || true",
     "start": "node server.js",
     "dev": "node server.js",
     "serve": "node server.js"

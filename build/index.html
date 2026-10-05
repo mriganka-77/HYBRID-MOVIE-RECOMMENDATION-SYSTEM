@@ -1,0 +1,2950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sylva Cinema — Hybrid Movie Recommendation System</title>
+<meta name="description" content="An intelligent movie recommendation system harmonizing collaborative filtering and deep semantic content-based algorithms through patient design and cinematic stewardship.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23383b34'/%3E%3Cpath fill='%23eef1e7' d='M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-2 14.5v-9l7 4.5z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lexend:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+<script>document.documentElement.className += " js";</script>
+<style>
+  /* ── design unit: 1u === 1px on the 1600 × 880 reference frame ───────── */
+  :root {
+    --u: calc(100vw / 1600);
+
+    --ink:            #ffffff;
+    --ink-soft:       rgba(255,255,255,.68);
+    --ink-faint:      rgba(255,255,255,.44);
+    --rule:           rgba(255,255,255,.07);
+
+    --bg-dark:        #1d201a;
+    --bg-surface:     #2b2e27;
+    --card:           #f2f3ef;
+    --card-ink:       #23261f;
+    --card-label:     #7c8177;
+    --card-sub:       #595e54;
+
+    --gold-leaf:      #d4e3bb;
+    --moss-accent:    #829668;
+    --amber-tag:      #df9b4b;
+    --emerald-tag:    #5ba578;
+
+    --ease: cubic-bezier(.22,.61,.36,1);
+    --ease-out: cubic-bezier(.16,1,.3,1);
+  }
+  @media (min-width:1900px){ :root{ --u: calc(1900px / 1600); } }
+
+  *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+
+  html{ background:#1c1e18; scroll-behavior:smooth; }
+  body{
+    font-family:'Lexend',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    font-weight:300;
+    color:var(--ink);
+    background:#1c1e18;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+  }
+
+  /* ── hero shell ──────────────────────────────────────────────────────── */
+  .hero{
+    position:relative;
+    width:100%;
+    height:100svh;
+    min-height:calc(880 * var(--u));
+    overflow:hidden;
+    isolation:isolate;
+    background:
+      radial-gradient(64% 52% at 27% 84%, rgba(200,218,175,.09) 0%, rgba(200,218,175,0) 72%),
+      radial-gradient(70% 60% at 92% 8%,  rgba(15,18,13,.50) 0%, rgba(15,18,13,0) 68%),
+      #353931;
+  }
+  .hero::after{
+    content:'';
+    position:absolute; inset:0;
+    background:
+      radial-gradient(72% 44% at 50% 117%, rgba(238,243,231,.45) 0%, rgba(238,243,231,.18) 42%, rgba(238,243,231,.03) 72%, rgba(238,243,231,0) 88%),
+      linear-gradient(180deg, rgba(238,243,231,0) 54%, rgba(238,243,231,.03) 78%, rgba(238,243,231,.085) 100%);
+    pointer-events:none; z-index:0;
+  }
+
+  .stage{
+    position:absolute; left:50%; top:50%;
+    margin-left:calc(-800 * var(--u));
+    margin-top:calc(-440 * var(--u));
+    width:calc(1600 * var(--u));
+    height:calc(880 * var(--u));
+  }
+
+  /* ── column guides (z 1) ─────────────────────────────────────────────── */
+  .guides{ position:absolute; inset:calc(-40 * var(--u)) 0; z-index:1; pointer-events:none; }
+  .guides i{
+    position:absolute; top:0; bottom:0; width:1px;
+    background:linear-gradient(180deg, rgba(255,255,255,0) 0%, var(--rule) 12%, var(--rule) 78%, rgba(255,255,255,0) 100%);
+  }
+
+  /* ── ghost wordmark (z 1) ────────────────────────────────────────────── */
+  .ghost{
+    position:absolute; z-index:1;
+    left:calc(10 * var(--u)); bottom:calc(-50 * var(--u));
+    font-size:calc(260 * var(--u));
+    line-height:.78;
+    font-weight:400;
+    letter-spacing:calc(26 * var(--u));
+    color:rgba(255,255,255,.04);
+    white-space:nowrap; user-select:none; pointer-events:none;
+  }
+
+  /* ── three.js canvas (z 2) ───────────────────────────────────────────── */
+  #scene{
+    position:absolute; inset:0; z-index:2;
+    width:100%; height:100%;
+    pointer-events:none;
+    opacity:0; transition:opacity .8s var(--ease);
+  }
+  .is-ready #scene{ opacity:1; }
+
+  /* ── nav: a floating dock (z 10) ────────────────────────────────────── */
+  .dock-wrap{
+    position:fixed; z-index:50;
+    top:calc(34 * var(--u)); left:0; right:0;
+    display:flex; justify-content:center;
+    pointer-events:none;
+  }
+  .dock{
+    pointer-events:auto;
+    display:flex; align-items:flex-start; gap:calc(4 * var(--u));
+    height:calc(50 * var(--u));
+    padding:calc(5 * var(--u));
+    border-radius:calc(16 * var(--u));
+    border:1px solid rgba(255,255,255,.14);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 42%),
+      rgba(26,30,24,.84);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:0 calc(10 * var(--u)) calc(30 * var(--u)) rgba(5,8,4,.45),
+               inset 0 1px rgba(255,255,255,.12);
+    isolation:isolate;
+  }
+  .dock-item{
+    position:relative; z-index:6;
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:none;
+    height:calc(38 * var(--u));
+    gap:calc(8 * var(--u));
+    padding:0 calc(14 * var(--u));
+    transform-origin:50% 0;
+    border:1px solid transparent;
+    border-radius:calc(11 * var(--u));
+    background:rgba(255,255,255,.04);
+    color:var(--ink-faint);
+    text-decoration:none; cursor:pointer;
+    font-family:inherit;
+    font-size:calc(11.5 * var(--u)); font-weight:500;
+    letter-spacing:calc(1.4 * var(--u)); text-transform:uppercase;
+    white-space:nowrap;
+    will-change:width,height,transform;
+    transition:color .18s var(--ease), border-color .2s var(--ease), background .2s var(--ease);
+  }
+  .dock-item[data-near="true"]{
+    z-index:7;
+    color:var(--ink);
+    border-color:rgba(255,255,255,.24);
+    background:rgba(38,44,35,.96);
+    box-shadow:0 calc(8 * var(--u)) calc(20 * var(--u)) rgba(10,14,8,.4);
+  }
+  .dock-item .glyph{
+    width:calc(15 * var(--u)); height:calc(15 * var(--u)); flex:none;
+    opacity:.68; transition:opacity .18s var(--ease);
+  }
+  .dock-item .glyph svg{
+    display:block; width:100%; height:100%;
+    fill:none; stroke:currentColor; stroke-width:1.35;
+    stroke-linecap:round; stroke-linejoin:round;
+  }
+  .dock-item[data-near="true"] .glyph{ opacity:1; }
+
+  .dock-mark{
+    width:calc(38 * var(--u)); padding:0;
+    background:#eef1e7; border-color:#eef1e7; color:#20241b;
+    overflow:hidden;
+  }
+  .dock-mark svg{ width:58%; height:58%; display:block; fill:currentColor; }
+  .dock-mark[data-near="true"]{ background:#fff; border-color:#fff; color:#181b15; }
+
+  .dock-item.is-active{
+    background:var(--card); border-color:var(--card); color:var(--card-ink);
+    box-shadow:0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(12,17,9,.28);
+  }
+  .dock-item.is-active .glyph{ opacity:.85; }
+  .dock-item--enter{ color:var(--ink); background:rgba(255,255,255,.09); border-color:rgba(255,255,255,.16); }
+
+  .dock-count{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:calc(18 * var(--u)); height:calc(18 * var(--u));
+    padding:0 calc(5 * var(--u));
+    border-radius:calc(9 * var(--u));
+    background:var(--moss-accent); color:#fff;
+    font-size:calc(10 * var(--u)); font-weight:600;
+  }
+
+  [data-spec]{ --spec-angle:2.4rad; --spec-bright:0; }
+  [data-spec]::after{
+    content:''; position:absolute; inset:-1px; z-index:5;
+    padding:1px; border-radius:inherit; pointer-events:none;
+    opacity:var(--spec-bright);
+    background:conic-gradient(from var(--spec-angle) at 50% 50%,
+      rgba(240,246,232,0) 0deg, rgba(240,246,232,.08) 14deg, rgba(240,246,232,.95) 28deg,
+      rgba(240,246,232,.16) 46deg, rgba(240,246,232,0) 68deg, rgba(240,246,232,0) 180deg,
+      rgba(240,246,232,.08) 194deg, rgba(240,246,232,.95) 208deg, rgba(240,246,232,.16) 226deg,
+      rgba(240,246,232,0) 248deg, rgba(240,246,232,0) 360deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude;
+  }
+
+  /* ── hero copy (z 4) ─────────────────────────────────────────────────── */
+  .tagline-badge{
+    position:absolute; z-index:4;
+    left:calc(46 * var(--u)); top:calc(160 * var(--u));
+    display:inline-flex; align-items:center; gap:calc(8 * var(--u));
+    padding:calc(5 * var(--u)) calc(12 * var(--u));
+    border-radius:calc(20 * var(--u));
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.05);
+    font-size:calc(11.5 * var(--u)); font-weight:500; letter-spacing:calc(2 * var(--u));
+    text-transform:uppercase; color:var(--gold-leaf);
+  }
+  .tagline-badge::before{
+    content:''; width:calc(6 * var(--u)); height:calc(6 * var(--u));
+    border-radius:50%; background:var(--moss-accent);
+    box-shadow:0 0 calc(8 * var(--u)) var(--moss-accent);
+  }
+
+  .headline{
+    position:absolute; z-index:4;
+    left:calc(46 * var(--u)); top:calc(202 * var(--u));
+    font-size:calc(63 * var(--u)); line-height:calc(65 * var(--u));
+    font-weight:300; letter-spacing:calc(-0.4 * var(--u));
+    color:var(--ink);
+  }
+  .headline span{ display:block; padding-bottom:.04em; }
+  .headline span i{ display:inline-block; font-style:normal; }
+  .headline em{ font-style:italic; font-weight:300; color:var(--gold-leaf); }
+
+  .lede{
+    position:absolute; z-index:4;
+    left:calc(530 * var(--u)); top:calc(204 * var(--u));
+    width:calc(240 * var(--u));
+    font-size:calc(15.5 * var(--u)); line-height:calc(23 * var(--u));
+    font-weight:300; color:var(--ink-soft);
+  }
+
+  /* ── liquid-metal controls ────────────────────────────────────────── */
+  .pill-clip{
+    position:absolute; z-index:4;
+    left:calc(650 * var(--u)); top:calc(360 * var(--u));
+    width:calc(420 * var(--u)); height:calc(270 * var(--u));
+    margin:calc(-135 * var(--u)) 0 0 calc(-210 * var(--u));
+    clip-path:inset(calc(72 * var(--u)) calc(50 * var(--u))
+                    calc(26 * var(--u)) calc(50 * var(--u)) round calc(62 * var(--u)));
+  }
+  .pill{
+    position:absolute; inset:0; --mr:calc(150 * var(--u));
+    display:grid; place-items:center;
+  }
+
+  .liquid-stage{
+    --lu:calc(var(--h) / 516);
+    --bh:var(--h);
+    --pad:calc(900 * var(--lu));
+    position:relative;
+    width:max-content; height:max-content;
+    padding:var(--pad);
+    display:grid; place-items:center;
+    touch-action:manipulation;
+    font-family:'Lexend','Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .liquid-stage--explore{ --h:calc(62 * var(--u)); }
+  .liquid-stage--play{ --h:calc(88 * var(--u)); }
+
+  .liquid-plate{
+    position:absolute;
+    inset:var(--pad);
+    border-radius:999px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.015) 44%, rgba(255,255,255,0) 64%),
+      rgba(10,14,10,.55);
+    box-shadow:
+      0 calc(var(--h) * 0.08) calc(var(--h) * 0.18) rgba(0,0,0,.45),
+      0 calc(var(--h) * 0.24) calc(var(--h) * 0.50) rgba(0,0,0,.35),
+      0 calc(var(--h) * 0.48) calc(var(--h) * 0.96) rgba(0,0,0,.22),
+      inset 0 1px 0 rgba(255,255,255,.16),
+      inset 0 calc(var(--h) * -0.02) calc(var(--h) * 0.05) rgba(255,255,255,.06);
+    transition:box-shadow .38s cubic-bezier(.22,.61,.36,1),
+               background .38s cubic-bezier(.22,.61,.36,1);
+  }
+  .liquid-stage.hot .liquid-plate{
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.025) 44%, rgba(255,255,255,0) 64%),
+      rgba(8,12,8,.65);
+    box-shadow:
+      0 calc(var(--h) * 0.10) calc(var(--h) * 0.22) rgba(0,0,0,.52),
+      0 calc(var(--h) * 0.32) calc(var(--h) * 0.66) rgba(0,0,0,.40),
+      inset 0 1px 0 rgba(255,255,255,.22);
+  }
+  .liquid-fx{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+  .liquid-button{
+    position:relative;
+    height:var(--bh);
+    border:0; background:none;
+    border-radius:999px;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+    font-family:inherit; font-weight:500; line-height:1; letter-spacing:0;
+    cursor:pointer; -webkit-tap-highlight-color:transparent; outline:none;
+  }
+  .liquid-button .ico{ display:block; flex:none; overflow:visible; }
+  .liquid-button .lbl{ display:block; transform:translateY(calc(1 * var(--lu))); }
+  .liquid-button--explore{
+    padding:0 calc(220 * var(--lu)) 0 calc(90 * var(--lu));
+    gap:calc(110 * var(--lu));
+    font-size:calc(135 * var(--lu));
+    letter-spacing:calc(10 * var(--lu));
+    text-transform:uppercase;
+  }
+  .liquid-button--explore .ico{
+    width:calc(140 * var(--lu)); height:calc(140 * var(--lu));
+  }
+  .liquid-button--play{
+    width:var(--bh); height:var(--bh); padding:0;
+  }
+  .liquid-button--play .ico{
+    width:calc(170 * var(--lu)); height:calc(170 * var(--lu));
+    margin-left:calc(14 * var(--lu));
+  }
+  .liquid-button--play .lbl{ display:none; }
+
+  /* ── play button (z 4) ─────────────────────────────────────────────── */
+  .play-wrap{
+    position:absolute; z-index:4; pointer-events:none;
+    left:calc(187 * var(--u)); top:calc(431 * var(--u));
+    width:calc(170 * var(--u)); height:calc(170 * var(--u));
+  }
+  .play-wrap > *{ pointer-events:auto; }
+  .play-clip{
+    position:absolute; left:50%; top:50%;
+    width:calc(396 * var(--u)); height:calc(396 * var(--u));
+    margin:calc(-198 * var(--u)) 0 0 calc(-198 * var(--u));
+    clip-path:inset(calc(131 * var(--u)) calc(106 * var(--u))
+                    calc(73 * var(--u)) calc(106 * var(--u)) round calc(92 * var(--u)));
+  }
+  .play-glass{ position:absolute; inset:0; display:grid; place-items:center; }
+  .play-ring{
+    position:absolute; inset:0; pointer-events:none;
+    border:1px solid rgba(255,255,255,.18); border-radius:50%;
+  }
+  .play-ring::after{
+    content:''; position:absolute; inset:calc(-1 * var(--u));
+    border:1px solid rgba(255,255,255,.36); border-radius:50%;
+    opacity:0; transform:scale(.86);
+    transition:opacity .7s var(--ease), transform .9s var(--ease-out);
+  }
+  .play-clip:hover ~ .play-ring::after{ opacity:1; transform:scale(1.06); }
+
+  /* ── stats (z 4) ─────────────────────────────────────────────────────── */
+  .stat{ position:absolute; z-index:4; display:flex; align-items:flex-start; gap:calc(10 * var(--u)); }
+  .stat--a{ left:calc(1250 * var(--u)); top:calc(216 * var(--u)); }
+  .stat--b{ left:calc(1346 * var(--u)); top:calc(326 * var(--u)); }
+  .stat .mark{ width:calc(32 * var(--u)); height:calc(32 * var(--u)); flex:none; margin-top:calc(2 * var(--u)); color:rgba(255,255,255,.45); }
+  .stat .mark svg{ width:100%; height:100%; display:block; }
+  .stat dt{ font-size:calc(13 * var(--u)); font-weight:300; color:var(--ink-soft); line-height:calc(18 * var(--u)); }
+  .stat dd{ font-size:calc(14 * var(--u)); font-weight:600; color:var(--ink); line-height:calc(22 * var(--u)); }
+
+  /* ── cards ───────────────────────────────────────────────────────────── */
+  .card{
+    position:absolute;
+    background:var(--card); border-radius:calc(46 * var(--u));
+    box-shadow:0 calc(30 * var(--u)) calc(70 * var(--u)) rgba(12,17,10,.35);
+    transition:box-shadow .8s var(--ease), transform .6s var(--ease-out);
+    cursor:pointer;
+  }
+  .card--about{
+    left:calc(890 * var(--u)); top:calc(200 * var(--u));
+    width:calc(330 * var(--u)); height:calc(305 * var(--u));
+  }
+  .card--stove{
+    z-index:4; will-change:transform;
+    left:calc(1237 * var(--u)); top:calc(482 * var(--u));
+    width:calc(328 * var(--u)); height:calc(310 * var(--u));
+  }
+  .card .label{
+    position:absolute; left:calc(34 * var(--u));
+    font-size:calc(14.5 * var(--u)); font-weight:400; color:var(--card-label);
+    letter-spacing:calc(0.5 * var(--u));
+  }
+  .card h2{
+    position:absolute; left:calc(34 * var(--u)); right:calc(64 * var(--u));
+    font-size:calc(25 * var(--u)); line-height:calc(28 * var(--u));
+    font-weight:400; letter-spacing:calc(-0.4 * var(--u)); color:var(--card-ink);
+  }
+  .card--about .label{ top:calc(148 * var(--u)); }
+  .card--about h2{ top:calc(174 * var(--u)); width:calc(170 * var(--u)); }
+  .card--stove .label{ top:calc(38 * var(--u)); }
+  .card--stove h2{ top:calc(62 * var(--u)); }
+
+  .card .meta-score{
+    position:absolute; left:calc(34 * var(--u)); top:calc(120 * var(--u));
+    display:inline-flex; align-items:center; gap:calc(6 * var(--u));
+    font-size:calc(12 * var(--u)); font-weight:600; color:var(--moss-accent);
+  }
+  .card .meta-score span{
+    display:inline-block; padding:calc(2 * var(--u)) calc(6 * var(--u));
+    border-radius:calc(6 * var(--u)); background:rgba(130,150,104,.14);
+  }
+
+  .card figure{
+    position:absolute; left:calc(14 * var(--u)); right:calc(14 * var(--u));
+    border-radius:calc(34 * var(--u)); overflow:hidden;
+    isolation:isolate; background:#20281e;
+  }
+  .card--stove figure{ bottom:calc(14 * var(--u)); height:calc(158 * var(--u)); }
+  .card--about figure{ top:calc(14 * var(--u)); height:calc(122 * var(--u)); }
+
+  .portal-media{
+    position:absolute; inset:calc(-9 * var(--u)); z-index:1; display:block;
+    will-change:transform,clip-path;
+  }
+  .portal-media img{
+    width:100%; height:100%; object-fit:cover; display:block;
+    transform:scale(1.08);
+    filter:saturate(.95) contrast(1.05);
+    transition:transform 1.25s var(--ease-out), filter .8s var(--ease);
+  }
+  .card:hover .portal-media img{ transform:scale(1.14); filter:saturate(1.08) contrast(1.08); }
+  .pixel-reveal{
+    position:absolute; inset:0; z-index:3; width:100%; height:100%;
+    pointer-events:none; opacity:0; mix-blend-mode:screen;
+  }
+
+  .knob-float{
+    position:absolute; z-index:4; pointer-events:none;
+    left:calc(1142 * var(--u)); top:calc(427 * var(--u));
+    width:calc(58 * var(--u)); height:calc(58 * var(--u));
+  }
+  .knob-float > *{ pointer-events:auto; }
+  .knob--about{ left:0; top:0; }
+  .card .knob, .knob--about{
+    position:absolute; z-index:4; right:calc(20 * var(--u)); bottom:calc(20 * var(--u));
+    width:calc(56 * var(--u)); height:calc(56 * var(--u));
+    border:0; border-radius:50%; cursor:pointer;
+    background:#fbfcf8; display:grid; place-items:center;
+    box-shadow:0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(16,21,13,.22);
+    transition:transform .5s var(--ease-out), background .4s var(--ease);
+  }
+  .knob--about{ right:auto; bottom:auto; }
+  .card--stove .knob{ width:calc(52 * var(--u)); height:calc(52 * var(--u)); right:calc(24 * var(--u)); bottom:calc(24 * var(--u)); }
+  .card .knob svg, .knob--about svg{ width:calc(20 * var(--u)); height:calc(20 * var(--u)); display:block; color:#30352a; }
+  .card .knob:hover, .knob--about:hover{ transform:scale(1.12) rotate(8deg); background:#fff; }
+  .card:hover{ box-shadow:0 calc(38 * var(--u)) calc(84 * var(--u)) rgba(12,17,10,.42); transform:translateY(calc(-4 * var(--u))); }
+
+  /* ── scroll cue (z 4) ────────────────────────────────────────────────── */
+  .scroll{
+    position:absolute; z-index:4;
+    left:calc(846 * var(--u)); top:calc(690 * var(--u));
+    display:flex; align-items:center; gap:calc(12 * var(--u));
+    writing-mode:vertical-rl;
+    font-size:calc(11 * var(--u)); font-weight:400;
+    letter-spacing:calc(4.4 * var(--u));
+    color:rgba(255,255,255,.55);
+    text-transform:uppercase; text-decoration:none;
+    cursor:pointer;
+  }
+  .scroll .track{ position:relative; width:1px; height:calc(56 * var(--u)); background:rgba(255,255,255,.2); overflow:hidden; }
+  .scroll .track::after{
+    content:''; position:absolute; inset:0 0 auto; height:40%;
+    background:rgba(255,255,255,.85);
+    animation:trickle 2.6s var(--ease) infinite;
+  }
+  @keyframes trickle{
+    0%   { transform:translateY(-105%); opacity:0; }
+    22%  { opacity:1; }
+    78%  { opacity:1; }
+    100% { transform:translateY(255%); opacity:0; }
+  }
+
+  /* ── entrance wipes ─────────────────────────────────────────────────── */
+  .js .mask{ clip-path:inset(100% 0 0 0 round var(--mr,0px)); }
+  .is-ready .mask{
+    clip-path:inset(0 0 0 0 round var(--mr,0px));
+    transition:clip-path 1.05s var(--ease-out) var(--d,0ms);
+  }
+  .js .mask-circle{ clip-path:circle(0% at 50% 50%); }
+  .is-ready .mask-circle{
+    clip-path:circle(76% at 50% 50%);
+    transition:clip-path 1.1s var(--ease-out) var(--d,0ms);
+  }
+  .js .fade{ opacity:0; }
+  .is-ready .fade{ opacity:1; transition:opacity 1.3s var(--ease) var(--d,0ms); }
+  .intro-done .mask, .intro-done .mask-circle{ clip-path:none; transition:none; }
+  .card{ --mr:calc(46 * var(--u)); }
+
+  .js .dock{ opacity:0; }
+  .is-ready .dock{ opacity:1; transition:opacity .8s var(--ease) 80ms; }
+  .js .dock-item{ clip-path:inset(0 0 105% 0); }
+  .is-ready .dock-item{
+    clip-path:inset(0 0 -30% 0);
+    transition:clip-path .9s var(--ease-out) var(--d,0ms),
+               color .18s var(--ease), border-color .2s var(--ease), background .2s var(--ease);
+  }
+  .intro-done .dock-item{ clip-path:none; }
+
+  .js .headline span i{ opacity:0; transform:translateY(calc(16 * var(--u))); }
+  .is-ready .headline span i{
+    opacity:1; transform:none;
+    transition:opacity 1.05s var(--ease) var(--d,0ms),
+               transform 1.25s var(--ease-out) var(--d,0ms);
+  }
+
+  /* ── pointer parallax ──────────────────────────────────────────────── */
+  .par{
+    transform:
+      perspective(1400px)
+      translate3d(calc(var(--px,0) * var(--pd,0) * -1px),
+                  calc(var(--py,0) * var(--pd,0) * -0.62px),
+                  0)
+      rotateY(calc(var(--px,0) * var(--pr,0) * 1deg))
+      rotateX(calc(var(--py,0) * var(--pr,0) * -0.7deg));
+  }
+  .knob-float{ transform-origin:calc(-87 * var(--u)) calc(-74.5 * var(--u)); }
+
+  /* ── SECTIONS: THE HYBRID ENGINE & DISCOVERY EXPERIENCE ──────────────── */
+  .section-wrap{
+    position:relative; z-index:20;
+    max-width:1440px; margin:0 auto; padding:100px 36px 140px;
+  }
+  .section-head{
+    margin-bottom:48px;
+    display:flex; justify-content:space-between; align-items:flex-end;
+    flex-wrap:wrap; gap:24px;
+    border-bottom:1px solid rgba(255,255,255,.08);
+    padding-bottom:32px;
+  }
+  .section-title-wrap h2{
+    font-size:clamp(32px, 3.4vw, 54px); font-weight:300;
+    letter-spacing:-0.03em; color:#fff; line-height:1.15;
+    margin-bottom:10px;
+  }
+  .section-title-wrap p{
+    font-size:clamp(15px, 1.1vw, 18px); color:var(--ink-soft);
+    font-weight:300; max-width:680px; line-height:1.6;
+  }
+  .badge-label{
+    display:inline-block; font-size:12px; font-weight:500;
+    letter-spacing:2px; text-transform:uppercase; color:var(--gold-leaf);
+    margin-bottom:12px;
+  }
+
+  /* ── Interactive Hybrid Engine Controls Panel ───────────────────────── */
+  .engine-panel{
+    background:rgba(33,37,30,.88);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:32px; padding:36px;
+    box-shadow:0 30px 80px rgba(8,11,7,.45);
+    margin-bottom:56px;
+    backdrop-filter:blur(16px);
+  }
+  .engine-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+    gap:32px; align-items:start;
+  }
+  .control-group{
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .control-label{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:14px; font-weight:500; color:var(--ink-soft);
+    letter-spacing:0.5px;
+  }
+  .control-value{
+    font-size:14px; font-weight:600; color:var(--gold-leaf);
+  }
+  .slider-track{
+    width:100%; height:8px; border-radius:4px;
+    background:rgba(255,255,255,.1); outline:none;
+    -webkit-appearance:none; cursor:pointer;
+    accent-color:var(--moss-accent);
+  }
+  .slider-track::-webkit-slider-thumb{
+    -webkit-appearance:none; width:22px; height:22px;
+    border-radius:50%; background:#eef1e7;
+    box-shadow:0 0 12px rgba(0,0,0,.5);
+    border:2px solid var(--moss-accent); cursor:pointer;
+  }
+
+  /* Persona buttons */
+  .persona-list{
+    display:flex; flex-wrap:wrap; gap:10px;
+  }
+  .persona-btn{
+    padding:9px 18px; border-radius:24px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.05);
+    color:var(--ink-soft); font-family:inherit;
+    font-size:13px; font-weight:400; cursor:pointer;
+    transition:all .25s var(--ease);
+  }
+  .persona-btn:hover{
+    background:rgba(255,255,255,.12); color:#fff;
+    border-color:rgba(255,255,255,.25);
+  }
+  .persona-btn.active{
+    background:var(--card); color:var(--card-ink);
+    border-color:var(--card); font-weight:600;
+    box-shadow:0 6px 16px rgba(0,0,0,.3);
+  }
+
+  /* Search & Anchor Picker */
+  .search-input-wrap{
+    position:relative; width:100%;
+  }
+  .search-input{
+    width:100%; padding:14px 20px 14px 44px;
+    border-radius:20px; border:1px solid rgba(255,255,255,.16);
+    background:rgba(20,24,18,.8); color:#fff;
+    font-family:inherit; font-size:14.5px; outline:none;
+    transition:border-color .2s var(--ease);
+  }
+  .search-input:focus{ border-color:var(--gold-leaf); }
+  .search-icon{
+    position:absolute; left:16px; top:50%; transform:translateY(-50%);
+    width:18px; height:18px; color:var(--ink-faint); pointer-events:none;
+  }
+
+  /* Formula display banner */
+  .formula-banner{
+    margin-top:28px; padding:18px 24px; border-radius:18px;
+    background:rgba(18,22,16,.6);
+    border:1px solid rgba(255,255,255,.07);
+    display:flex; justify-content:space-between; align-items:center;
+    flex-wrap:wrap; gap:16px; font-size:13.5px; color:var(--ink-soft);
+  }
+  .formula-code{
+    font-family:monospace; color:var(--gold-leaf); font-size:14px;
+  }
+
+  /* ── Movie Recommendation Grid ──────────────────────────────────────── */
+  .movie-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr));
+    gap:32px;
+  }
+  .movie-card{
+    position:relative; border-radius:28px;
+    background:var(--card); color:var(--card-ink);
+    box-shadow:0 20px 50px rgba(10,14,8,.28);
+    overflow:hidden; display:flex; flex-direction:column;
+    transition:transform .45s var(--ease-out), box-shadow .45s var(--ease-out);
+    cursor:pointer;
+  }
+  .movie-card:hover{
+    transform:translateY(-8px);
+    box-shadow:0 32px 70px rgba(10,14,8,.45);
+  }
+  .movie-poster-wrap{
+    position:relative; width:100%; height:340px;
+    background:#1c201a; overflow:hidden;
+  }
+  .movie-poster-wrap img{
+    width:100%; height:100%; object-fit:cover; display:block;
+    transition:transform .8s var(--ease-out);
+  }
+  .movie-card:hover .movie-poster-wrap img{
+    transform:scale(1.08);
+  }
+  .movie-badge-score{
+    position:absolute; top:16px; right:16px; z-index:3;
+    padding:6px 12px; border-radius:16px;
+    background:rgba(26,30,22,.9); backdrop-filter:blur(8px);
+    color:var(--gold-leaf); font-size:12px; font-weight:600;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+    display:flex; align-items:center; gap:5px;
+  }
+  .movie-play-overlay{
+    position:absolute; inset:0; z-index:2;
+    background:rgba(20,24,18,.35); display:grid; place-items:center;
+    opacity:0; transition:opacity .3s var(--ease);
+  }
+  .movie-card:hover .movie-play-overlay{ opacity:1; }
+  .play-icon-btn{
+    width:56px; height:56px; border-radius:50%;
+    background:#fff; border:none; display:grid; place-items:center;
+    color:#20241b; cursor:pointer;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+    transform:scale(.85); transition:transform .3s var(--ease-out);
+  }
+  .movie-card:hover .play-icon-btn{ transform:scale(1); }
+
+  .movie-content{
+    padding:24px; display:flex; flex-direction:column; flex:1;
+  }
+  .movie-meta-top{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:8px; font-size:12px; color:var(--card-label);
+    letter-spacing:1px; text-transform:uppercase; font-weight:500;
+  }
+  .movie-title{
+    font-size:21px; font-weight:500; line-height:1.25;
+    color:var(--card-ink); margin-bottom:8px;
+    letter-spacing:-0.02em;
+  }
+  .movie-reason{
+    font-size:13px; line-height:1.55; color:var(--card-sub);
+    margin-bottom:18px; flex:1;
+  }
+  .movie-breakdown-bar{
+    display:flex; flex-direction:column; gap:6px;
+    margin-bottom:18px; padding:12px; border-radius:14px;
+    background:rgba(30,35,26,.05);
+  }
+  .breakdown-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:11.5px; color:var(--card-sub);
+  }
+  .breakdown-meter{
+    width:100%; height:4px; border-radius:2px;
+    background:rgba(0,0,0,.08); overflow:hidden;
+  }
+  .breakdown-fill{ height:100%; border-radius:2px; }
+  .fill-cf{ background:var(--moss-accent); }
+  .fill-cb{ background:var(--amber-tag); }
+
+  .movie-card-footer{
+    display:flex; justify-content:space-between; align-items:center;
+    border-top:1px solid rgba(0,0,0,.06); padding-top:14px;
+  }
+  .rate-stars{
+    display:flex; gap:3px; cursor:pointer;
+  }
+  .rate-stars svg{
+    width:17px; height:17px; fill:rgba(0,0,0,.15);
+    transition:fill .2s, transform .15s;
+  }
+  .rate-stars svg.active{ fill:#d99938; }
+  .rate-stars svg:hover{ transform:scale(1.2); }
+
+  .btn-watchlist-add{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:7px 14px; border-radius:14px;
+    border:1px solid rgba(35,38,31,.2);
+    background:none; color:var(--card-ink);
+    font-family:inherit; font-size:12px; font-weight:500;
+    cursor:pointer; transition:all .2s var(--ease);
+  }
+  .btn-watchlist-add:hover{
+    background:#23261f; color:#fff; border-color:#23261f;
+  }
+  .btn-watchlist-add.saved{
+    background:var(--moss-accent); color:#fff; border-color:var(--moss-accent);
+  }
+
+  /* ── Cinema Universes (Habitats) ────────────────────────────────────── */
+  .universes-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(310px, 1fr));
+    gap:28px; margin-top:36px;
+  }
+  .universe-card{
+    position:relative; height:380px; border-radius:32px;
+    overflow:hidden; isolation:isolate; cursor:pointer;
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 20px 50px rgba(0,0,0,.35);
+  }
+  .universe-card img{
+    width:100%; height:100%; object-fit:cover; display:block;
+    filter:brightness(0.65) saturate(1.1);
+    transition:transform 1s var(--ease-out), filter .8s var(--ease);
+  }
+  .universe-card:hover img{
+    transform:scale(1.08); filter:brightness(0.75) saturate(1.2);
+  }
+  .universe-info{
+    position:absolute; inset:0; z-index:2;
+    padding:32px; display:flex; flex-direction:column;
+    justify-content:flex-end;
+    background:linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(18,22,16,.92) 100%);
+  }
+  .universe-tag{
+    font-size:12px; font-weight:600; text-transform:uppercase;
+    letter-spacing:1.5px; color:var(--gold-leaf); margin-bottom:8px;
+  }
+  .universe-name{
+    font-size:26px; font-weight:400; color:#fff;
+    margin-bottom:8px; line-height:1.2;
+  }
+  .universe-desc{
+    font-size:14px; color:var(--ink-soft); line-height:1.5;
+  }
+
+  /* ── Architecture Section (Matrix Factorization) ────────────────────── */
+  .arch-box{
+    border-radius:36px; padding:44px;
+    background:
+      radial-gradient(70% 60% at 85% 15%, rgba(130,150,104,.14) 0%, rgba(130,150,104,0) 70%),
+      rgba(27,31,24,.92);
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 30px 90px rgba(5,8,4,.5);
+  }
+  .arch-flow{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    gap:28px; margin-top:36px; position:relative;
+  }
+  .arch-step{
+    padding:28px; border-radius:24px;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.09);
+    transition:background .3s var(--ease), border-color .3s var(--ease);
+  }
+  .arch-step:hover{
+    background:rgba(255,255,255,.07);
+    border-color:rgba(255,255,255,.2);
+  }
+  .step-num{
+    display:inline-block; font-size:13px; font-weight:600;
+    color:var(--gold-leaf); margin-bottom:12px;
+  }
+  .step-title{
+    font-size:18px; font-weight:500; color:#fff;
+    margin-bottom:10px;
+  }
+  .step-body{
+    font-size:13.5px; color:var(--ink-soft); line-height:1.6;
+  }
+
+  /* ── Video Trailer / Movie Modal ─────────────────────────────────────── */
+  .modal-overlay{
+    position:fixed; inset:0; z-index:100;
+    background:rgba(12,15,10,.88);
+    backdrop-filter:blur(18px);
+    display:grid; place-items:center;
+    opacity:0; pointer-events:none;
+    transition:opacity .4s var(--ease);
+    padding:24px;
+  }
+  .modal-overlay.active{
+    opacity:1; pointer-events:auto;
+  }
+  .modal-content{
+    position:relative; width:100%; max-width:960px;
+    max-height:90vh; overflow-y:auto;
+    background:var(--card); color:var(--card-ink);
+    border-radius:36px; box-shadow:0 40px 100px rgba(0,0,0,.7);
+    transform:scale(0.94); transition:transform .4s var(--ease-out);
+  }
+  .modal-overlay.active .modal-content{ transform:scale(1); }
+  .modal-close{
+    position:absolute; top:24px; right:24px; z-index:10;
+    width:42px; height:42px; border-radius:50%;
+    background:rgba(0,0,0,.7); border:none; color:#fff;
+    display:grid; place-items:center; cursor:pointer;
+    transition:transform .2s, background .2s;
+  }
+  .modal-close:hover{ transform:scale(1.1); background:#000; }
+  .modal-video-frame{
+    width:100%; aspect-ratio:16/9; background:#000;
+    border-top-left-radius:36px; border-top-right-radius:36px;
+    overflow:hidden;
+  }
+  .modal-video-frame iframe{
+    width:100%; height:100%; border:none; display:block;
+  }
+  .modal-body{
+    padding:36px;
+  }
+  .modal-title{
+    font-size:32px; font-weight:500; margin-bottom:8px;
+    letter-spacing:-0.02em;
+  }
+  .modal-meta{
+    display:flex; flex-wrap:wrap; gap:14px; align-items:center;
+    font-size:14px; color:var(--card-label); margin-bottom:20px;
+  }
+  .modal-meta-pill{
+    background:rgba(0,0,0,.08); padding:4px 10px; border-radius:12px;
+    color:var(--card-ink); font-weight:500;
+  }
+  .modal-desc{
+    font-size:16px; line-height:1.65; color:var(--card-sub);
+    margin-bottom:28px;
+  }
+
+  /* ── Watchlist Drawer ────────────────────────────────────────────────── */
+  .watchlist-drawer{
+    position:fixed; top:0; right:0; bottom:0; z-index:90;
+    width:min(440px, 90vw);
+    background:rgba(26,30,22,.96);
+    border-left:1px solid rgba(255,255,255,.14);
+    box-shadow:-20px 0 60px rgba(0,0,0,.6);
+    backdrop-filter:blur(20px);
+    transform:translateX(105%);
+    transition:transform .45s var(--ease-out);
+    display:flex; flex-direction:column;
+  }
+  .watchlist-drawer.open{ transform:translateX(0); }
+  .drawer-head{
+    padding:28px; border-bottom:1px solid rgba(255,255,255,.1);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .drawer-head h3{ font-size:20px; font-weight:400; color:#fff; }
+  .drawer-close{
+    background:none; border:none; color:var(--ink-faint);
+    cursor:pointer; display:grid; place-items:center;
+  }
+  .drawer-close:hover{ color:#fff; }
+  .drawer-list{
+    flex:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:16px;
+  }
+  .drawer-empty{
+    text-align:center; padding:60px 20px; color:var(--ink-faint); font-size:14.5px;
+  }
+  .drawer-item{
+    display:flex; gap:14px; padding:12px; border-radius:18px;
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+  }
+  .drawer-item img{
+    width:64px; height:84px; object-fit:cover; border-radius:12px;
+  }
+  .drawer-item-info{
+    flex:1; display:flex; flex-direction:column; justify-content:center;
+  }
+  .drawer-item-title{ font-size:14.5px; font-weight:500; color:#fff; margin-bottom:4px; }
+  .drawer-item-genre{ font-size:12px; color:var(--ink-faint); margin-bottom:8px; }
+  .drawer-del-btn{
+    align-self:center; background:none; border:none; color:rgba(255,255,255,.3);
+    cursor:pointer; padding:6px;
+  }
+  .drawer-del-btn:hover{ color:#ff6b6b; }
+
+  /* ── Toast notification ─────────────────────────────────────────────── */
+  .toast{
+    position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(100px);
+    z-index:150; padding:12px 24px; border-radius:30px;
+    background:rgba(26,32,22,.96); color:#fff; border:1px solid rgba(255,255,255,.2);
+    box-shadow:0 12px 36px rgba(0,0,0,.5); backdrop-filter:blur(10px);
+    font-size:13.5px; font-weight:500; display:flex; align-items:center; gap:10px;
+    opacity:0; transition:all .35s var(--ease); pointer-events:none;
+  }
+  .toast.active{ transform:translateX(-50%) translateY(0); opacity:1; }
+
+  /* ── Responsive adjustments (mobile) ────────────────────────────────── */
+  @media (max-width:900px){
+    :root{ --u: calc(100vw / 760); }
+    .hero{ height:auto; min-height:100svh; }
+    .stage{
+      position:relative; left:auto; top:auto; margin:0;
+      width:100%; height:calc(1625 * var(--u));
+    }
+    .guides i:nth-child(3){ display:none; }
+    .guides i:nth-child(1){ left:calc(253 * var(--u)) !important; }
+    .guides i:nth-child(2){ left:calc(506 * var(--u)) !important; }
+
+    .dock-wrap{ top:calc(24 * var(--u)); }
+    .dock{
+      height:max(54px, calc(56 * var(--u)));
+      padding:max(5px, calc(5 * var(--u)));
+      gap:max(4px, calc(4 * var(--u)));
+      border-radius:max(16px, calc(17 * var(--u)));
+    }
+    .dock-item{
+      height:max(42px, calc(44 * var(--u)));
+      width:max(42px, calc(44 * var(--u)));
+      padding:0; border-radius:max(12px, calc(13 * var(--u)));
+    }
+    .dock-item span:not(.glyph):not(.dock-count){ display:none; }
+    .dock-item .glyph{ width:max(18px, calc(19 * var(--u))); height:max(18px, calc(19 * var(--u))); }
+
+    .headline{ left:calc(34 * var(--u)); top:calc(140 * var(--u)); font-size:calc(56 * var(--u)); line-height:calc(60 * var(--u)); }
+    .lede{ left:calc(34 * var(--u)); top:calc(280 * var(--u)); width:calc(420 * var(--u)); font-size:calc(18 * var(--u)); line-height:calc(26 * var(--u)); }
+    .tagline-badge{ left:calc(34 * var(--u)); top:calc(96 * var(--u)); }
+
+    .pill-clip{
+      left:calc(34 * var(--u)); top:calc(410 * var(--u));
+      width:calc(506 * var(--u)); height:calc(334 * var(--u));
+      margin:calc(-167 * var(--u)) 0 0 calc(-79 * var(--u));
+      clip-path:inset(calc(93 * var(--u)) calc(74 * var(--u)) calc(1 * var(--u)) calc(74 * var(--u)) round calc(76 * var(--u)));
+    }
+    .liquid-stage--explore{ --h:calc(74 * var(--u)); }
+    .play-wrap{ display:none; }
+
+    .stat--a{ left:calc(34 * var(--u));  top:calc(520 * var(--u)); }
+    .stat--b{ left:calc(396 * var(--u)); top:calc(520 * var(--u)); }
+
+    .card--about{ left:calc(34 * var(--u)); top:calc(1050 * var(--u)); width:calc(692 * var(--u)); height:calc(250 * var(--u)); }
+    .card--stove{ left:calc(34 * var(--u)); top:calc(1324 * var(--u)); width:calc(692 * var(--u)); height:calc(268 * var(--u)); }
+    .card--stove figure{ left:auto; right:calc(16 * var(--u)); bottom:calc(16 * var(--u)); width:calc(300 * var(--u)); height:calc(150 * var(--u)); }
+    .card--about figure{ left:auto; right:calc(16 * var(--u)); top:calc(16 * var(--u)); width:calc(224 * var(--u)); height:calc(218 * var(--u)); }
+    .knob-float{ left:calc(644 * var(--u)); top:calc(1218 * var(--u)); }
+
+    .scroll{ left:calc(702 * var(--u)); top:calc(470 * var(--u)); }
+    .ghost{ font-size:calc(180 * var(--u)); bottom:calc(660 * var(--u)); }
+
+    .section-wrap{ padding:70px 20px 100px; }
+    .engine-panel{ padding:24px; border-radius:24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HERO STAGE ──────────────────────────────────────────────────────── -->
+<main class="hero" id="hero">
+  <canvas id="scene"></canvas>
+
+  <!-- ── FLOATING NAVIGATION DOCK ──────────────────────────────────────── -->
+  <div class="dock-wrap">
+    <nav class="dock par-dock" style="--pd:5" data-spec aria-label="Primary">
+      <a class="dock-item dock-mark" data-dock data-spec data-burst href="#hero" style="--d:120ms" aria-label="Sylva Cinema — Home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 3v18M3 12h18M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </a>
+      <a class="dock-item is-active" data-dock data-spec data-burst href="#recommendations" style="--d:180ms">
+        <span class="glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </span>
+        <span>Recommendations</span>
+      </a>
+      <a class="dock-item" data-dock data-spec data-burst href="#habitats" style="--d:230ms">
+        <span class="glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </span>
+        <span>Universes</span>
+      </a>
+      <a class="dock-item" data-dock data-spec data-burst href="#architecture" style="--d:280ms">
+        <span class="glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </span>
+        <span>Algorithm</span>
+      </a>
+      <a class="dock-item" data-dock data-spec data-burst href="#watchlist" id="dock-watchlist-btn" style="--d:330ms">
+        <span class="glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        </span>
+        <span>Watchlist</span>
+        <span class="dock-count" id="watchlist-count">0</span>
+      </a>
+    </nav>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="guides fade" style="--d:900ms" aria-hidden="true">
+      <i style="left:calc(405 * var(--u))"></i>
+      <i style="left:calc(748 * var(--u))"></i>
+      <i style="left:calc(1091 * var(--u))"></i>
+    </div>
+
+    <div class="ghost fade" style="--d:1150ms" aria-hidden="true">CINEMA</div>
+
+    <span class="tagline-badge fade" style="--d:300ms">Hybrid Collaborative + Content Engine</span>
+
+    <!-- Hero Card 1: Our Architecture -->
+    <article class="card card--about mask" id="card-hero-arch" style="--d:760ms; --pd:10; --pr:2.2">
+      <figure class="portal" data-delay="920">
+        <span class="portal-media"><img crossorigin="anonymous" src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800&auto=format&fit=crop" alt="Cinema projector light stream" loading="eager" decoding="async"></span>
+        <canvas class="pixel-reveal" aria-hidden="true"></canvas>
+      </figure>
+      <p class="label">Our Architecture</p>
+      <h2>Dual-Harmonic Filtering.</h2>
+    </article>
+
+    <span class="knob-float" style="--pd:10; --pr:2.2">
+      <button class="knob knob--about mask-circle" style="--d:1100ms" aria-label="Learn about the hybrid algorithm" onclick="location.href='#architecture'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </span>
+
+    <h1 class="headline" style="--pd:18; --pr:1.2">
+      <span><i style="--d:260ms">Step into</i></span>
+      <span><i style="--d:360ms">the <em>living screen</em></i></span>
+    </h1>
+
+    <p class="lede mask" style="--d:480ms; --pd:14; --pr:1">
+      An intelligent recommendation engine blending community collaborative intelligence with deep semantic story embeddings.
+    </p>
+
+    <!-- Liquid Metal Explore Button -->
+    <div class="pill-clip">
+      <div class="pill mask" style="--d:600ms; --pd:15; --pr:1.4">
+        <div class="liquid-stage liquid-stage--explore" data-liquid-metal="explore">
+          <div class="liquid-plate plate" aria-hidden="true"></div>
+          <canvas class="liquid-fx" aria-hidden="true"></canvas>
+          <button class="liquid-button liquid-button--explore btn" type="button" onclick="document.getElementById('recommendations').scrollIntoView({behavior:'smooth'})">
+            <svg class="ico" viewBox="0 0 115 115" aria-hidden="true">
+              <g stroke="currentColor" stroke-width="10" stroke-linecap="round">
+                <circle cx="57.5" cy="57.5" r="45" fill="none"/>
+                <path d="M46 38 L76 57.5 L46 77 Z" fill="currentColor"/>
+              </g>
+            </svg>
+            <span class="lbl">Explore Films</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Play Film Trailer Button -->
+    <span class="play-wrap" style="--pd:20">
+      <span class="play-clip">
+        <span class="play-glass mask-circle" style="--d:900ms">
+          <span class="liquid-stage liquid-stage--play" data-liquid-metal="play">
+            <span class="liquid-plate plate" aria-hidden="true"></span>
+            <canvas class="liquid-fx" aria-hidden="true"></canvas>
+            <button class="liquid-button liquid-button--play btn" type="button" aria-label="Play Featured Trailer" onclick="openTrailerModal('dune2')">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 5.2v13.6L19 12z" fill="currentColor"/>
+              </svg>
+            </button>
+          </span>
+        </span>
+      </span>
+      <span class="play-ring mask-circle" style="--d:840ms" aria-hidden="true"></span>
+    </span>
+
+    <dl class="stat stat--a mask" style="--d:700ms; --pd:12">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+          <circle cx="15" cy="15" r="10.5" stroke-dasharray="0.6 3.6"/>
+          <circle cx="15" cy="15" r="5.6" stroke-dasharray="0.6 3.2"/>
+          <circle cx="15" cy="15" r="1.1" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      <div><dt>Latent Factors</dt><dd>512D SVD Space</dd></div>
+    </dl>
+
+    <dl class="stat stat--b mask" style="--d:770ms; --pd:13">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+          <path d="M15 3.5v5M15 21.5v5M3.5 15h5M21.5 15h5M6.9 6.9l3.5 3.5M19.6 19.6l3.5 3.5M23.1 6.9l-3.5 3.5M10.4 19.6l-3.5 3.5"/>
+          <circle cx="15" cy="15" r="3.6"/>
+        </svg>
+      </span>
+      <div><dt>Hybrid Precision</dt><dd>96.4% Relevance</dd></div>
+    </dl>
+
+    <!-- Hero Card 2: Featured Film Highlight -->
+    <article class="card card--stove mask" id="card-hero-featured" style="--d:880ms; --pd:22; --pr:2.4" onclick="openTrailerModal('dune2')">
+      <p class="label">Featured Masterpiece</p>
+      <h2>Dune: Part Two</h2>
+      <div class="meta-score"><span>99.2% Match</span> • Denis Villeneuve</div>
+      <figure class="portal" data-delay="1080">
+        <span class="portal-media"><img crossorigin="anonymous" src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop" alt="Desert dunes under alien sun" loading="eager" decoding="async"></span>
+        <canvas class="pixel-reveal" aria-hidden="true"></canvas>
+      </figure>
+      <button class="knob" aria-label="Open Dune: Part Two preview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/>
+        </svg>
+      </button>
+    </article>
+
+    <a class="scroll mask" style="--d:1040ms; --pd:9" href="#recommendations">Discover<span class="track"></span></a>
+  </div>
+</main>
+
+
+<!-- ── INTERACTIVE RECOMMENDATION ENGINE ──────────────────────────────── -->
+<section class="section-wrap" id="recommendations">
+  <div class="section-head">
+    <div class="section-title-wrap">
+      <span class="badge-label">The Neural Cine-Lab</span>
+      <h2>Hybrid Recommendations</h2>
+      <p>Fine-tune the balance between Collaborative Filtering (wisdom of cinephile clusters) and Content-Based Semantics (plot, tropes, score & directorial voice).</p>
+    </div>
+    <div>
+      <span style="font-size:13px; color:var(--ink-faint); display:block; text-align:right;">Dataset: MovieLens 25M + TMDB Latents</span>
+    </div>
+  </div>
+
+  <!-- Interactive Control Deck -->
+  <div class="engine-panel">
+    <div class="engine-grid">
+
+      <!-- Column 1: Anchor Film Selection -->
+      <div class="control-group">
+        <div class="control-label">
+          <span>Anchor Film / Inspiration</span>
+          <span class="control-value" id="anchor-title-display">Interstellar (2014)</span>
+        </div>
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="movie-search" class="search-input" placeholder="Search film (e.g. Inception, Arrival, Parasite)..." autocomplete="off">
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+          <span style="font-size:11.5px; color:var(--ink-faint); margin-right:4px;">Quick Anchors:</span>
+          <button class="persona-btn active" onclick="setAnchor('interstellar')">Interstellar</button>
+          <button class="persona-btn" onclick="setAnchor('inception')">Inception</button>
+          <button class="persona-btn" onclick="setAnchor('bladerunner')">Blade Runner</button>
+          <button class="persona-btn" onclick="setAnchor('dune2')">Dune 2</button>
+          <button class="persona-btn" onclick="setAnchor('darkknight')">The Dark Knight</button>
+          <button class="persona-btn" onclick="setAnchor('parasite')">Parasite</button>
+          <button class="persona-btn" onclick="setAnchor('spirited')">Spirited Away</button>
+          <button class="persona-btn" onclick="setAnchor('whiplash')">Whiplash</button>
+          <button class="persona-btn" onclick="setAnchor('fightclub')">Fight Club</button>
+          <button class="persona-btn" onclick="setAnchor('pulpfiction')">Pulp Fiction</button>
+          <button class="persona-btn" onclick="setAnchor('spiderverse')">Spider-Verse</button>
+        </div>
+      </div>
+
+      <!-- Column 2: Hybrid Weight Balance -->
+      <div class="control-group">
+        <div class="control-label">
+          <span>Algorithm Weight (α)</span>
+          <span class="control-value" id="alpha-val">50% Collaborative / 50% Content</span>
+        </div>
+        <input type="range" id="weight-slider" class="slider-track" min="0" max="100" value="50" oninput="updateWeights(this.value)">
+        <div style="display:flex; justify-content:space-between; font-size:11.5px; color:var(--ink-faint);">
+          <span>Content-Based (Tropes & Tags)</span>
+          <span>Balanced</span>
+          <span>Collaborative (User Behavior)</span>
+        </div>
+      </div>
+
+      <!-- Column 3: Cinephile Persona Preset -->
+      <div class="control-group">
+        <div class="control-label">
+          <span>Cinephile Persona</span>
+          <span class="control-value" id="persona-name">Sci-Fi Visionary</span>
+        </div>
+        <div class="persona-list">
+          <button class="persona-btn active" onclick="setPersona('scifi')">🌌 Sci-Fi Visionary</button>
+          <button class="persona-btn" onclick="setPersona('auteur')">🎭 Auteur & Arthouse</button>
+          <button class="persona-btn" onclick="setPersona('thriller')">⚡ Psychological Stakes</button>
+          <button class="persona-btn" onclick="setPersona('animation')">🌸 Dreamscape Animation</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Live Mathematical Formula Bar -->
+    <div class="formula-banner">
+      <div>
+        <span>Active Model Function: </span>
+        <strong class="formula-code" id="formula-text">Score = 0.50 · CF(User, Item) + 0.50 · CosineSim(Tags, Item)</strong>
+      </div>
+      <div>
+        <span style="color:var(--moss-accent); font-weight:500;">✓ Model Status: Recomputed in real-time</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Genre Filter & Results Counter Toolbar -->
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:28px;">
+    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+      <span style="font-size:12px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:1px; margin-right:4px;">Filter Genre:</span>
+      <button class="persona-btn active genre-filter-btn" onclick="filterByGenre('All', this)">All</button>
+      <button class="persona-btn genre-filter-btn" onclick="filterByGenre('Sci-Fi', this)">Sci-Fi</button>
+      <button class="persona-btn genre-filter-btn" onclick="filterByGenre('Drama', this)">Drama</button>
+      <button class="persona-btn genre-filter-btn" onclick="filterByGenre('Thriller', this)">Thriller</button>
+      <button class="persona-btn genre-filter-btn" onclick="filterByGenre('Animation', this)">Animation</button>
+      <button class="persona-btn genre-filter-btn" onclick="filterByGenre('Crime', this)">Crime</button>
+      <button class="persona-btn genre-filter-btn" onclick="filterByGenre('Action', this)">Action</button>
+      <button class="persona-btn genre-filter-btn" onclick="filterByGenre('Mystery', this)">Mystery</button>
+    </div>
+    <div style="font-size:13px; color:var(--ink-soft);" id="recs-count-display">
+      Displaying curated hybrid recommendations
+    </div>
+  </div>
+
+  <!-- Recommendation Output Cards -->
+  <div class="movie-grid" id="movie-cards-container">
+    <!-- Rendered via JS -->
+  </div>
+</section>
+
+
+<!-- ── CINEMATIC UNIVERSES (HABITATS) ─────────────────────────────────── -->
+<section class="section-wrap" id="habitats">
+  <div class="section-head">
+    <div class="section-title-wrap">
+      <span class="badge-label">Curated Universes</span>
+      <h2>Film Habitats</h2>
+      <p>Clusters formed in the high-dimensional latent space of cinema history. Explore cohesive thematic micro-worlds.</p>
+    </div>
+  </div>
+
+  <div class="universes-grid">
+    <!-- Universe 1 -->
+    <div class="universe-card" onclick="filterByHabitat('cosmos')">
+      <img src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop" alt="Deep cosmic space">
+      <div class="universe-info">
+        <span class="universe-tag">Cluster 01 • 1,240 Films</span>
+        <h3 class="universe-name">Echoes of the Cosmos</h3>
+        <p class="universe-desc">Existential space exploration, time dilation, and human loneliness against infinite stellar voids.</p>
+      </div>
+    </div>
+
+    <!-- Universe 2 -->
+    <div class="universe-card" onclick="filterByHabitat('neon')">
+      <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop" alt="Neon cyber city in rain">
+      <div class="universe-info">
+        <span class="universe-tag">Cluster 02 • 890 Films</span>
+        <h3 class="universe-name">Neon & Rainy Shadows</h3>
+        <p class="universe-desc">Cyberpunk ethics, rainy alleys, replicant souls, and atmospheric synthwave neo-noir.</p>
+      </div>
+    </div>
+
+    <!-- Universe 3 -->
+    <div class="universe-card" onclick="filterByHabitat('ghibli')">
+      <img src="https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=800&auto=format&fit=crop" alt="Misty enchanted moss forest">
+      <div class="universe-info">
+        <span class="universe-tag">Cluster 03 • 620 Films</span>
+        <h3 class="universe-name">Hand-Drawn Reverie</h3>
+        <p class="universe-desc">Breathtaking hand-crafted animation, spirit worlds, emotional nostalgia, and organic wonder.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── MATHEMATICAL ARCHITECTURE DEEP DIVE ───────────────────────────── -->
+<section class="section-wrap" id="architecture">
+  <div class="section-head">
+    <div class="section-title-wrap">
+      <span class="badge-label">Algorithmic Formulation</span>
+      <h2>The Hybrid Matrix Architecture</h2>
+      <p>How our pipeline prevents cold-start biases while elevating hidden masterpieces.</p>
+    </div>
+  </div>
+
+  <div class="arch-box">
+    <div style="max-width:760px; margin-bottom:32px;">
+      <h3 style="font-size:24px; font-weight:400; color:#fff; margin-bottom:12px;">Ensemble Hybridization Theory</h3>
+      <p style="font-size:15px; color:var(--ink-soft); line-height:1.7;">
+        Pure collaborative filtering suffers from the cold-start problem and popularity bias. Pure content-based filtering creates narrow echo chambers. Sylva Cinema unifies both via an adaptive convex fusion function over low-rank matrix decomposition:
+      </p>
+    </div>
+
+    <div class="arch-flow">
+      <div class="arch-step">
+        <span class="step-num">LAYER 01</span>
+        <h4 class="step-title">Collaborative SVD</h4>
+        <p class="step-body">
+          Decomposes the User-Movie rating matrix $R \in \mathbb{R}^{M \times N}$ into low-rank latent orthogonal matrices $U \Sigma V^T$. Identifies implicit taste archetypes without needing metadata.
+        </p>
+      </div>
+
+      <div class="arch-step">
+        <span class="step-num">LAYER 02</span>
+        <h4 class="step-title">Semantic Content Vector</h4>
+        <p class="step-body">
+          BERT embeddings and TF-IDF representations for narrative arcs, directorial signatures, Hans Zimmer motifs, and cinematographer color grading. Evaluated via high-dimensional Cosine Similarity.
+        </p>
+      </div>
+
+      <div class="arch-step">
+        <span class="step-num">LAYER 03</span>
+        <h4 class="step-title">Convex Weight Fusion</h4>
+        <p class="step-body">
+          $\hat{S}(u, i) = \alpha \cdot \hat{R}_{CF}(u, i) + (1-\alpha) \cdot \text{Sim}_{CB}(i, A_u) + \gamma \cdot \text{Novelty}(i)$.
+          Dynamically tuned via the user interface in real time.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ── WATCHLIST SLIDE DRAWER ─────────────────────────────────────────── -->
+<aside class="watchlist-drawer" id="watchlist-drawer" aria-label="Personal Watchlist">
+  <div class="drawer-head">
+    <h3>Curated Watchlist</h3>
+    <button class="drawer-close" onclick="toggleWatchlist(false)" aria-label="Close Watchlist">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-list" id="drawer-items-list">
+    <!-- Rendered via JS -->
+  </div>
+</aside>
+
+
+<!-- ── FULLSCREEN TRAILER / FILM DETAIL MODAL ────────────────────────── -->
+<div class="modal-overlay" id="trailer-modal" onclick="if(event.target===this) closeTrailerModal()">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeTrailerModal()" aria-label="Close modal">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="modal-video-frame">
+      <iframe id="trailer-iframe" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+    <div class="modal-body">
+      <h3 class="modal-title" id="modal-film-title">Film Title</h3>
+      <div class="modal-meta" id="modal-film-meta">
+        <!-- Rendered via JS -->
+      </div>
+      <p class="modal-desc" id="modal-film-desc">Description</p>
+      <div style="display:flex; gap:12px;">
+        <button class="btn-watchlist-add" id="modal-btn-watchlist" onclick="toggleModalWatchlist()">
+          + Add to Watchlist
+        </button>
+        <button class="persona-btn active" id="modal-btn-recommend" onclick="setAnchorFromModal()">
+          Use as New Recommendation Anchor
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification banner -->
+<div class="toast" id="toast-msg">
+  <span style="color:var(--gold-leaf)">✓</span>
+  <span id="toast-text">Model Retrained</span>
+</div>
+
+<!-- Scripts -->
+<script src="assets/three.min.js"></script>
+<script>
+/* Fallback if local three.min.js is blocked by strict file rules */
+if (!window.THREE) {
+  var s = document.createElement('script');
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+  document.head.appendChild(s);
+}
+</script>
+
+<!-- Liquid Metal WebGL2 dispersion shader button engine -->
+<script>
+(function () {
+  'use strict';
+
+  function mountLiquidMetal(host) {
+    var hostWindow = globalThis;
+    var document = {
+      body: host,
+      getElementById: function(id) {
+        if (id === 'stage') return host;
+        if (id === 'fx') return host.querySelector('.liquid-fx');
+        if (id === 'btn') return host.querySelector('.liquid-button');
+        return null;
+      },
+      querySelector: function(selector) { return host.querySelector(selector); }
+    };
+    var window = {
+      devicePixelRatio: hostWindow.devicePixelRatio,
+      addEventListener: hostWindow.addEventListener.bind(hostWindow)
+    };
+
+    var VERT = '#version 300 es\nin vec2 position; void main(){ gl_Position = vec4(position,0.,1.); }';
+
+    var HEAD = '#version 300 es\nprecision highp float;\nout vec4 o;\nuniform vec2 uC;\nuniform vec2 uHalf;\nuniform float uT;\nuniform float uHover;\nuniform float uPress;\nuniform vec4 uRip[3];\nuniform vec4 uRipK;\nuniform vec4 uRipK2;\nuniform vec4 uPtr;\nuniform vec4 uPtrK;\n#define PI 3.14159265\nfloat sdPill(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return min(max(q.x,q.y),0.) + length(max(q,0.)) - r; }\nfloat ripple(vec2 p, float t){ float sum = 0.; for(int i = 0; i < 3; i++){ if(uRip[i].w < 0.5) continue; float age = t - uRip[i].z; if(age < 0. || age > 4.) continue; vec2 rp = p - uRip[i].xy; float facet = 1. + uRipK2.x * cos(uRipK2.y * atan(rp.y, rp.x) + age * 2.1 + float(i) * 2.4); float x = (length(rp) - age * uRipK.x * facet) / uRipK.y; sum += exp(-pow(abs(x) + 1e-4, uRipK2.z)) * exp(-age * uRipK.z); } return sum; }\nfloat pointerW(vec2 p){ if(uPtr.z < 0.001) return 0.; float d = length(p - uPtr.xy) / uPtrK.x; return exp(-d*d) * uPtr.z; }\nvec2 pointerWarp(vec2 p){ float w = pointerW(p); if(w <= 0.) return vec2(0.); return normalize(p - uPtr.xy + vec2(1e-5)) * w * (uPtrK.y + uPtrK.z * uPtr.w); }\n';
+
+    var FRAG_RIM = HEAD + 'uniform float uBw;\nuniform float uE[8];\nfloat perim(vec2 d, float a, float r){ float P = 4.*a + 2.*PI*r; float s; if(d.x >= a){ float th = atan(d.y, d.x - a); if(th < 0.) th += 2.*PI; s = (th <= PI*0.5) ? r*th : P - r*(2.*PI - th); } else if(d.x <= -a){ float th = atan(d.y, d.x + a); if(th < 0.) th += 2.*PI; s = r*PI*0.5 + 2.*a + r*(th - PI*0.5); } else if(d.y >= 0.){ s = r*PI*0.5 + (a - d.x); } else { s = r*PI*1.5 + 2.*a + (d.x + a); } return s / P; }\nfloat pb(float u, float w){ u = fract(u); float x = min(u, 1.-u); return exp(-(x*x)/(w*w)); }\nfloat rimHot(float s, float t){ float v = uE[0]; v += 0.62 * pb(s - t*uE[4], 0.075); v += 0.44 * pb(s + t*uE[4]*0.63 + 0.41, 0.135); v += 0.30 * pb(s - t*uE[4]*0.34 + 0.73, 0.200); return v; }\nfloat rimBand(float sd, float off){ return 1. - smoothstep(0., uBw*1.05, abs(sd + uBw*0.55 + off)); }\nvoid main(){ vec2 d = gl_FragCoord.xy - uC; float sd = sdPill(d, uHalf, uHalf.y); if(sd > uBw*2.5 || sd < -uBw*3.5){ o = vec4(0.); return; } float a = max(uHalf.x - uHalf.y, 0.); float s = perim(d, a, uHalf.y); float top = mix(1., 0.5 + 0.5 * (d.y / uHalf.y), uE[5]); vec2 p = vec2(d.x, -d.y) / (uHalf.y * 2.); float lift = 1. + uPress * uE[6] + ripple(p, uT) * uE[7] + pointerW(p) * uPtrK.w; o = vec4(vec3(rimBand(sd, uE[2]) * rimHot(s + uE[3], uT), rimBand(sd, 0.) * rimHot(s, uT), rimBand(sd, -uE[2]) * rimHot(s - uE[3], uT)) * uE[1] * top * lift, 1.); }\n';
+
+    var FRAG_SCENE = HEAD + 'uniform float uP[21];\nfloat h21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }\nfloat vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); float a = h21(i), b = h21(i+vec2(1,0)), c = h21(i+vec2(0,1)), d = h21(i+vec2(1,1)); return mix(mix(a,b,f.x), mix(c,d,f.x), f.y) * 2. - 1.; }\nfloat fbm(vec2 p, float g){ float s = 0., a = 1., n = 0.; for(int i=0;i<4;i++){ s += a*vn(p); n += a; p = p*2.03 + 11.7; a *= g; } return s / n; }\nfloat fbm(vec2 p){ return fbm(p, 0.5); }\nfloat wig(float x, float t, float seed){ return vn(vec2(x, t*0.150 + seed)) * 0.60 + vn(vec2(x*2.07 + 4., t*0.105 + seed)) * 0.27 + vn(vec2(x*4.30 - 7., t*0.080 + seed)) * 0.13; }\nfloat valleyAt(vec2 p, float t){ return wig(p.x*uP[0], t, 0.0) * uP[1]; }\nfloat densAt(vec2 p, float t){ return uP[2] * exp(uP[3] * wig(p.x*uP[4] + 9.0, t, 2.7)); }\nfloat surface(vec2 p, float t){ float V = (p.y - valleyAt(p,t)) * densAt(p,t); V += uP[5] * fbm(p*vec2(0.8, 1.7)*uP[6] + vec2(t*0.05, -t*0.03), uP[17]); return V - uP[7]; }\nfloat tone(float v){ float u = fract(v); float e = uP[9], W = uP[10] * 0.5; return smoothstep(0.5-W-e, 0.5-W, u) * (1. - smoothstep(0.5+W, 0.5+W+e, u)); }\nvec3 spec(float t){ return clamp(vec3(1.5) - abs(4.*t - vec3(3.,2.,1.)), 0., 1.); }\nvoid main(){ vec2 d = gl_FragCoord.xy - uC; float sd = sdPill(d, uHalf, uHalf.y); float pill = 1. - smoothstep(-1., 1., sd); float S = uHalf.y * 2.; float t = uT; if(uHover <= 0.0015 || pill <= 0.0015){ o = vec4(0., 0., 0., pill); return; } vec2 p = vec2(d.x, -d.y) / S; vec2 q = p + pointerWarp(p); float h0 = surface(q, t); vec2 gp = vec2(dFdx(h0), -dFdy(h0)) * S; float V = surface(q - gp * uP[8] / max(uP[2], .001), t); vec2 gd = normalize(gp + vec2(1e-5)); V += uP[13] * fbm(vec2(dot(q,gd)*uP[14], dot(q, vec2(-gd.y,gd.x))*uP[14]*0.04) + vec2(0., t*0.06)); float rip = ripple(p, t); float well = pointerW(p); V += rip * uRipK.w; const int N = 21; float mid = 1. - pow(0.5, uP[12]); vec3 col = vec3(0.), wsum = vec3(0.); for(int i=0;i<N;i++){ float k = float(i)/float(N-1); vec3 w = spec(k); col += w * tone(V + ((1. - pow(1. - k, uP[12])) - mid) * uP[11]); wsum += w; } col /= wsum; col = pow(col, vec3(uP[15])); float lit = smoothstep(uP[18], uP[19], q.y - valleyAt(q, t)); lit *= mix(1., lit, 0.55); col *= uP[16] * lit; col = col * (1. + rip * 1.15 + well * 0.60); o = vec4(col * pill * uHover, pill); }\n';
+
+    var FRAG_DOWN = '#version 300 es\nprecision highp float;\nout vec4 o;\nuniform sampler2D uTex, uTex2;\nuniform vec2 uDstTexel;\nuniform vec2 uSrcTexel;\nuniform float uAdd;\nvoid main(){ vec2 uv = gl_FragCoord.xy * uDstTexel; vec2 e = uDstTexel * 0.25; vec4 s = texture(uTex, uv + vec2(-e.x,-e.y)) + texture(uTex, uv + vec2( e.x,-e.y)) + texture(uTex, uv + vec2(-e.x, e.y)) + texture(uTex, uv + vec2( e.x, e.y)); s *= 0.25; if(uAdd > 0.5){ vec4 r = texture(uTex2, uv + vec2(-e.x,-e.y)) + texture(uTex2, uv + vec2( e.x,-e.y)) + texture(uTex2, uv + vec2(-e.x, e.y)) + texture(uTex2, uv + vec2( e.x, e.y)); s.rgb += r.rgb * 0.25; } o = s; }\n';
+
+    var FRAG_BLUR = '#version 300 es\nprecision highp float;\nout vec4 o;\nuniform sampler2D uTex; uniform vec2 uTexel; uniform vec2 uDir; uniform float uR;\nvoid main(){ vec2 uv = gl_FragCoord.xy * uTexel; vec2 st = uTexel * uDir * uR; vec4 s = texture(uTex, uv) * 0.1964; s += (texture(uTex, uv + st*1.4118) + texture(uTex, uv - st*1.4118)) * 0.2969; s += (texture(uTex, uv + st*3.2941) + texture(uTex, uv - st*3.2941)) * 0.0944; s += (texture(uTex, uv + st*5.1765) + texture(uTex, uv - st*5.1765)) * 0.0104; o = s; }\n';
+
+    var FRAG_COMP = HEAD + 'uniform sampler2D uSoft, uRim, uGlow;\nuniform vec2 uRes;\nuniform float uGlowGain, uGlowIn, uOccl, uDim, uPunch;\nvoid main(){ vec2 uv = gl_FragCoord.xy / uRes; vec3 glow = texture(uGlow, uv).rgb; vec2 d = gl_FragCoord.xy - uC; float sd = sdPill(d, uHalf, uHalf.y); float pill = 1. - smoothstep(-1., 1., sd); vec4 m = texture(uSoft, uv); float veil = 1. - smoothstep(0.46, 0.88, abs(d.y) / uHalf.y); vec3 metal = pow(max(m.rgb / max(m.a, 1e-3), 0.), vec3(uPunch)); vec3 core = metal * pill * mix(1., uDim, veil) + texture(uRim, uv).rgb; float rip = ripple(vec2(d.x, -d.y) / (uHalf.y * 2.), uT); core += vec3(rip * rip) * uRipK2.w * pill * mix(1., 0.42, veil); float sdSh = sdPill(d + vec2(0., uHalf.y * 0.62), uHalf * 0.94, uHalf.y * 0.94); float occl = uOccl * exp(-max(sdSh, 0.) / (uHalf.y * 0.75)); vec3 rgb = core + glow * uGlowGain * mix(1., uGlowIn, pill) * (1. - occl * (1. - pill)); float a = clamp(max(rgb.r, max(rgb.g, rgb.b)), 0., 1.); o = vec4(min(rgb, vec3(1.)), a); }\n';
+
+    var cv = document.getElementById('fx');
+    if (!cv) return;
+    var gl = cv.getContext('webgl2', {alpha:true, antialias:false, premultipliedAlpha:true, powerPreference:'high-performance'});
+    if (!gl) return;
+
+    var stage = document.getElementById('stage');
+    var btn   = document.getElementById('btn');
+
+    var P = {
+      valFreq: 0.50, valAmp: 0.55, dens: 2.40, densVar: 2.20, densFreq: 0.32,
+      wobAmp: 0.12, wobFreq: 1.60, lift: 0.05, refract: 0.18, edge: 0.04,
+      width: 0.46, disp: 0.30, skew: 1.50, fineAmp: 0.0, fineFreq: 9.0,
+      gamma: 1.00, gain: 1.90, octGain: 0.32, litLo: -0.26, litHi: 0.10, dim: 0.44
+    };
+    var PKEYS = Object.keys(P);
+
+    var E = {
+      base: 0.20, hot: 0.82, chromA: 0.42, chromS: 0.030, speed: 0.070,
+      top: 0.35, press: 0.85, ripple: 1.60
+    };
+    var EKEYS = Object.keys(E);
+
+    var C = {
+      glow: host.dataset.liquidMetal === 'play' ? 1.28 : 1.95,
+      glowR: host.dataset.liquidMetal === 'play' ? 0.94 : 1.30,
+      glowIn: 0.30, occl: 0.62, soften: 0.24, punch: 1.50
+    };
+
+    var R = {
+      speed: 1.85, width: 0.20, decay: 1.35, amp: 1.35, facet: 0.18,
+      lobes: 6.0, sharp: 1.15, emit: 0.45,
+      ptrRad: 0.55, ptrAmp: 0.32, ptrFast: 0.40, ptrRim: 0.80, ptrLag: 0.0016, ptrVref: 4.5
+    };
+
+    function sh(type, src){
+      var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      return s;
+    }
+    function prog(fs){
+      var p = gl.createProgram();
+      gl.attachShader(p, sh(gl.VERTEX_SHADER, VERT));
+      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+      gl.bindAttribLocation(p, 0, 'position');
+      gl.linkProgram(p);
+      var u = {};
+      var n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+      for(var i=0;i<n;i++){ var info = gl.getActiveUniform(p,i); u[info.name.replace('[0]','')] = gl.getUniformLocation(p, info.name); }
+      return {p:p, u:u};
+    }
+    var pScene = prog(FRAG_SCENE), pRim = prog(FRAG_RIM),
+        pDown  = prog(FRAG_DOWN),  pBlur = prog(FRAG_BLUR), pComp = prog(FRAG_COMP);
+
+    var vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    var vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    var hasFloat = !!gl.getExtension('EXT_color_buffer_half_float');
+    function makeTarget(){
+      var tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      var fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      return {tex:tex, fbo:fbo, w:0, h:0};
+    }
+    function sizeTarget(t, w, h){
+      if(t.w === w && t.h === h) return;
+      t.w = w; t.h = h;
+      gl.bindTexture(gl.TEXTURE_2D, t.tex);
+      if(hasFloat) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      else         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8,   w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    }
+    var T_core = makeTarget(), T_rim = makeTarget(),
+        T_s1   = makeTarget(), T_s2  = makeTarget(),
+        T_a    = makeTarget(), T_b   = makeTarget();
+
+    var W = 0, H = 0, DPR = 1, BW = 0, BH = 0, CX = 0, CY = 0;
+    var DOWN = 4;
+    var GLOW_TEX = 129;
+    var needResize = true;
+
+    function resize(){
+      var r  = stage.getBoundingClientRect();
+      var br = btn.getBoundingClientRect();
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      var w = Math.max(2, Math.round(r.width  * DPR));
+      var h = Math.max(2, Math.round(r.height * DPR));
+      if(w !== W || h !== H){ W = w; H = h; cv.width = W; cv.height = H; }
+      BW = br.width  * DPR; BH = br.height * DPR;
+      CX = (br.left - r.left) * DPR + BW/2;
+      CY = H - ((br.top - r.top) * DPR + BH/2);
+      sizeTarget(T_core, W, H); sizeTarget(T_rim, W, H);
+      var hw = Math.max(2, Math.ceil(W/2)), hh = Math.max(2, Math.ceil(H/2));
+      sizeTarget(T_s1, hw, hh); sizeTarget(T_s2, hw, hh);
+      DOWN = Math.max(1, Math.min(4, Math.round(BH / GLOW_TEX)));
+      var dw = Math.max(2, Math.ceil(W/DOWN)), dh = Math.max(2, Math.ceil(H/DOWN));
+      sizeTarget(T_a, dw, dh); sizeTarget(T_b, dw, dh);
+      needResize = false;
+    }
+    new ResizeObserver(function(){ needResize = true; }).observe(stage);
+
+    function drawTo(t){
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t ? t.fbo : null);
+      gl.viewport(0, 0, t ? t.w : W, t ? t.h : H);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+
+    var uArr = new Float32Array(PKEYS.length);
+    var eArr = new Float32Array(EKEYS.length);
+    var hover = 0, hoverTarget = 0, clock = 0, last = performance.now();
+
+    var RIP = [0,1,2].map(function(){ return {x:0, y:0, t:-99, on:0}; });
+    var ripArr = new Float32Array(12);
+    var ripNext = 0, press = 0, pressTarget = 0;
+
+    var ptr = {x:0, y:0}, ptrS = {x:0, y:0};
+    var ptrAmt = 0, ptrSpeed = 0;
+
+    function addRipple(x, y){
+      var r = RIP[ripNext];
+      ripNext = (ripNext + 1) % RIP.length;
+      r.x = x; r.y = y; r.t = clock; r.on = 1;
+    }
+    function localPt(e){
+      var b = btn.getBoundingClientRect(), s = b.height;
+      return [(e.clientX - (b.left + b.width/2)) / s,
+              (e.clientY - (b.top  + b.height/2)) / s];
+    }
+
+    var IDLE_HZ = 30;
+    var lastDraw = 0;
+
+    function frame(now){
+      var dtRaw = (now - last) / 1000; last = now;
+      var dt = Math.min(dtRaw, 1/20);
+      clock += dt;
+
+      var k = hoverTarget > hover ? 1 - Math.pow(0.0012, dt) : 1 - Math.pow(0.00012, dt);
+      hover += (hoverTarget - hover) * k;
+
+      var pk = pressTarget > press ? 1 - Math.pow(1e-9, dt) : 1 - Math.pow(0.004, dt);
+      press += (pressTarget - press) * pk;
+
+      for(var i = 0; i < RIP.length; i++){
+        var r = RIP[i];
+        if(r.on && clock - r.t > 4) r.on = 0;
+        ripArr[i*4] = r.x; ripArr[i*4+1] = r.y; ripArr[i*4+2] = r.t; ripArr[i*4+3] = r.on;
+      }
+
+      var lag = 1 - Math.pow(R.ptrLag, dt);
+      var dx = (ptr.x - ptrS.x) * lag, dy = (ptr.y - ptrS.y) * lag;
+      ptrS.x += dx; ptrS.y += dy;
+      var inst = Math.min(Math.hypot(dx, dy) / Math.max(dt, 1e-3) / R.ptrVref, 1);
+      ptrSpeed += (inst - ptrSpeed) * (1 - Math.pow(inst > ptrSpeed ? 0.001 : 0.02, dt));
+      var wantWell = (on.over || on.press) ? 1 : 0;
+      ptrAmt += (wantWell - ptrAmt) * (1 - Math.pow(0.004, dt));
+
+      if(needResize) resize();
+
+      var idle = !on.over && !on.press && !on.focus && hover < 0.002 && press < 0.002 && ptrAmt < 0.002;
+      if(idle && now - lastDraw < 1000 / IDLE_HZ){ requestAnimationFrame(frame); return; }
+      lastDraw = now;
+
+      for(var j = 0; j < uArr.length; j++) uArr[j] = P[PKEYS[j]];
+      for(var m = 0; m < eArr.length; m++) eArr[m] = E[EKEYS[m]];
+      var bw = Math.max(1.5, 3.2 * (BH/516));
+
+      gl.useProgram(pScene.p);
+      gl.uniform2f(pScene.u.uC, CX, CY);
+      gl.uniform2f(pScene.u.uHalf, BW/2, BH/2);
+      gl.uniform1f(pScene.u.uT, clock);
+      gl.uniform1f(pScene.u.uHover, hover);
+      gl.uniform1f(pScene.u.uPress, press);
+      gl.uniform4fv(pScene.u.uRip, ripArr);
+      gl.uniform4f(pScene.u.uRipK, R.speed, R.width, R.decay, R.amp);
+      gl.uniform4f(pScene.u.uRipK2, R.facet, R.lobes, R.sharp, R.emit);
+      gl.uniform4f(pScene.u.uPtr, ptrS.x, ptrS.y, ptrAmt, ptrSpeed);
+      gl.uniform4f(pScene.u.uPtrK, R.ptrRad, R.ptrAmp, R.ptrFast, R.ptrRim);
+      gl.uniform1fv(pScene.u.uP, uArr);
+      drawTo(T_core);
+
+      gl.useProgram(pRim.p);
+      gl.uniform2f(pRim.u.uC, CX, CY);
+      gl.uniform2f(pRim.u.uHalf, BW/2, BH/2);
+      gl.uniform1f(pRim.u.uT, clock);
+      gl.uniform1f(pRim.u.uBw, bw);
+      gl.uniform1f(pRim.u.uPress, press);
+      gl.uniform4fv(pRim.u.uRip, ripArr);
+      gl.uniform4f(pRim.u.uRipK, R.speed, R.width, R.decay, R.amp);
+      gl.uniform4f(pRim.u.uRipK2, R.facet, R.lobes, R.sharp, R.emit);
+      gl.uniform4f(pRim.u.uPtr, ptrS.x, ptrS.y, ptrAmt, ptrSpeed);
+      gl.uniform4f(pRim.u.uPtrK, R.ptrRad, R.ptrAmp, R.ptrFast, R.ptrRim);
+      gl.uniform1fv(pRim.u.uE, eArr);
+      drawTo(T_rim);
+
+      gl.useProgram(pDown.p);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_core.tex);
+      gl.uniform1i(pDown.u.uTex, 0);
+      gl.uniform1f(pDown.u.uAdd, 0);
+      gl.uniform2f(pDown.u.uDstTexel, 1/T_s1.w, 1/T_s1.h);
+      gl.uniform2f(pDown.u.uSrcTexel, 1/W, 1/H);
+      drawTo(T_s1);
+
+      gl.useProgram(pBlur.p);
+      gl.uniform1i(pBlur.u.uTex, 0);
+      gl.uniform2f(pBlur.u.uTexel, 1/T_s1.w, 1/T_s1.h);
+      var sigTex = C.soften * (BH * 0.5) * 0.95;
+      if(sigTex > 0.1){
+        var iters = Math.min(4, Math.max(1, Math.ceil(sigTex / 3.0)));
+        gl.uniform1f(pBlur.u.uR, sigTex / Math.sqrt(iters) / 1.95);
+        for(var q = 0; q < iters; q++){
+          gl.bindTexture(gl.TEXTURE_2D, T_s1.tex); gl.uniform2f(pBlur.u.uDir, 1, 0); drawTo(T_s2);
+          gl.bindTexture(gl.TEXTURE_2D, T_s2.tex); gl.uniform2f(pBlur.u.uDir, 0, 1); drawTo(T_s1);
+        }
+      }
+
+      gl.useProgram(pDown.p);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_s1.tex);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T_rim.tex);
+      gl.uniform1i(pDown.u.uTex, 0);
+      gl.uniform1i(pDown.u.uTex2, 1);
+      gl.uniform1f(pDown.u.uAdd, 1);
+      gl.uniform2f(pDown.u.uDstTexel, 1/T_a.w, 1/T_a.h);
+      gl.uniform2f(pDown.u.uSrcTexel, 1/T_s1.w, 1/T_s1.h);
+      drawTo(T_a);
+
+      gl.useProgram(pBlur.p);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.uniform1i(pBlur.u.uTex, 0);
+      gl.uniform2f(pBlur.u.uTexel, 1/T_a.w, 1/T_a.h);
+      var rs = C.glowR * (BH / DOWN) / GLOW_TEX;
+      [1.0, 2.3, 5.2, 9.0].forEach(function(v){
+        gl.uniform1f(pBlur.u.uR, v * rs);
+        gl.bindTexture(gl.TEXTURE_2D, T_a.tex); gl.uniform2f(pBlur.u.uDir, 1, 0); drawTo(T_b);
+        gl.bindTexture(gl.TEXTURE_2D, T_b.tex); gl.uniform2f(pBlur.u.uDir, 0, 1); drawTo(T_a);
+      });
+
+      gl.useProgram(pComp.p);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_s1.tex);  gl.uniform1i(pComp.u.uSoft, 0);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T_rim.tex); gl.uniform1i(pComp.u.uRim, 1);
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, T_a.tex);   gl.uniform1i(pComp.u.uGlow, 2);
+      gl.uniform2f(pComp.u.uRes, W, H);
+      gl.uniform2f(pComp.u.uC, CX, CY);
+      gl.uniform2f(pComp.u.uHalf, BW/2, BH/2);
+      gl.uniform1f(pComp.u.uT, clock);
+      gl.uniform4fv(pComp.u.uRip, ripArr);
+      gl.uniform4f(pComp.u.uRipK, R.speed, R.width, R.decay, R.amp);
+      gl.uniform4f(pComp.u.uRipK2, R.facet, R.lobes, R.sharp, R.emit);
+      gl.uniform1f(pComp.u.uGlowGain, C.glow);
+      gl.uniform1f(pComp.u.uGlowIn, C.glowIn);
+      gl.uniform1f(pComp.u.uOccl, C.occl);
+      gl.uniform1f(pComp.u.uDim, P.dim);
+      gl.uniform1f(pComp.u.uPunch, C.punch);
+      drawTo(null);
+
+      requestAnimationFrame(frame);
+    }
+
+    var on = {over:false, press:false, focus:false};
+    var sync = function () {
+      hoverTarget = (on.over || on.press || on.focus) ? 1 : 0;
+      pressTarget = on.press ? 1 : 0;
+      host.classList.toggle('hot', hoverTarget > 0.5);
+      host.classList.toggle('press', on.press);
+    };
+
+    btn.addEventListener('pointerenter', function (e) {
+      if(e.pointerType !== 'mouse') return;
+      var pt = localPt(e);
+      ptr.x = pt[0]; ptr.y = pt[1];
+      ptrS.x = ptr.x; ptrS.y = ptr.y; ptrSpeed = 0;
+      on.over = true; sync();
+    });
+    btn.addEventListener('pointerleave', function (e) {
+      if(e.pointerType === 'mouse'){ on.over = false; sync(); }
+    });
+
+    window.addEventListener('pointermove', function (e) {
+      if(!on.over && !on.press) return;
+      var pt = localPt(e);
+      ptr.x = pt[0]; ptr.y = pt[1];
+    }, {passive:true});
+
+    btn.addEventListener('pointerdown', function (e) {
+      var pt = localPt(e);
+      ptr.x = pt[0]; ptr.y = pt[1];
+      on.press = true; sync();
+      addRipple(ptr.x, ptr.y);
+    });
+    window.addEventListener('pointerup',     function () { on.press = false; sync(); });
+    window.addEventListener('pointercancel', function () { on.press = false; sync(); });
+
+    btn.addEventListener('focus', function () { on.focus = true; sync(); });
+    btn.addEventListener('blur', function () { on.focus = false; sync(); });
+
+    resize();
+    requestAnimationFrame(frame);
+  }
+
+  var hosts = document.querySelectorAll('[data-liquid-metal]');
+  for (var i = 0; i < hosts.length; i++) mountLiquidMetal(hosts[i]);
+})();
+</script>
+
+<!-- Three.js 3D Cinematic Atmosphere + Parallax + Dock Logic -->
+<script>
+(function () {
+  'use strict';
+
+  var PARALLAX = '.headline,.lede,.pill,.play-wrap,.stat--a,.stat--b,.card--about,.knob-float,.card--stove,.scroll,.tagline-badge';
+  var pointer = { x: 0, y: 0 }, smooth = { x: 0, y: 0 };
+  var heroEl = document.getElementById('hero');
+  var ticking = false, parOn = false;
+
+  function startTick() {
+    if (ticking) return;
+    ticking = true;
+    (function loop() { requestAnimationFrame(loop); tick(); })();
+  }
+
+  var lastTick = 0;
+  function tick() {
+    var now = performance.now();
+    var dtUI = lastTick ? Math.min((now - lastTick) / 1000, 0.05) : 0.016;
+    lastTick = now;
+    drawDock(dtUI);
+    drawSpec(dtUI);
+
+    if (parOn && heroEl) {
+      smooth.x += (pointer.x - smooth.x) * 0.06;
+      smooth.y += (pointer.y - smooth.y) * 0.06;
+      var nx = Math.round(smooth.x * 1000) / 1000, ny = Math.round(smooth.y * 1000) / 1000;
+      heroEl.style.setProperty('--px', nx);
+      heroEl.style.setProperty('--py', ny);
+    }
+    if (renderer && scene && camera) {
+      renderScene();
+    }
+  }
+
+  function startParallax() {
+    startTick();
+    if (parOn) return;
+    parOn = true;
+    var nodes = document.querySelectorAll(PARALLAX);
+    for (var i = 0; i < nodes.length; i++) nodes[i].classList.add('par');
+
+    window.addEventListener('pointermove', function (e) {
+      if (e.pointerType === 'touch') return;
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
+    }, { passive: true });
+  }
+
+  /* ── Dock Logic (Proximity Magnification + Specular Track) ────────── */
+  var DOCK = { root: null, items: [], on: true, live: false, dirty: false, u: 1 };
+  var SPEC = { items: [], on: true, dirty: false };
+  var aimX = 0, aimY = 0, aimSeen = false;
+
+  function measureDock() {
+    if (!DOCK.root) return;
+    var stageEl = document.getElementById('stage');
+    DOCK.u = stageEl ? (stageEl.getBoundingClientRect().width / 1600) : 1;
+    for (var i = 0; i < DOCK.items.length; i++) {
+      var r = DOCK.items[i].el.getBoundingClientRect();
+      DOCK.items[i].w = r.width;
+      DOCK.items[i].h = r.height;
+    }
+    DOCK.dirty = true;
+  }
+
+  function drawDock(dt) {
+    if (!DOCK.root || !DOCK.on || !aimSeen) return;
+    var rr = DOCK.root.getBoundingClientRect();
+    if (aimX > rr.left - 40 && aimX < rr.right + 40 && aimY > rr.top - 40 && aimY < rr.bottom + 80) {
+      for (var i = 0; i < DOCK.items.length; i++) {
+        var st = DOCK.items[i], r = st.el.getBoundingClientRect();
+        var prox = Math.max(0, 1 - Math.abs(aimX - (r.left + r.width * 0.5)) / (120 * DOCK.u));
+        st.target = prox * prox * (3 - 2 * prox);
+        st.el.dataset.near = st.target > 0.08 ? 'true' : 'false';
+      }
+      DOCK.dirty = true;
+    }
+
+    if (!DOCK.dirty) return;
+    var moving = false;
+    for (var j = 0; j < DOCK.items.length; j++) {
+      var it = DOCK.items[j];
+      it.v += (it.target - it.v) * 12 * dt;
+      if (Math.abs(it.target - it.v) > 0.005) moving = true;
+      var extraW = it.el.classList.contains('dock-mark') ? 12 * DOCK.u : 14 * DOCK.u;
+      var extraH = 14 * DOCK.u;
+      it.el.style.width = (it.w + extraW * it.v) + 'px';
+      it.el.style.height = (it.h + extraH * it.v) + 'px';
+    }
+    if (!moving) DOCK.dirty = false;
+  }
+
+  function drawSpec(dt) {
+    if (!SPEC.on || !aimSeen) return;
+    for (var i = 0; i < SPEC.items.length; i++) {
+      var st = SPEC.items[i], r = st.el.getBoundingClientRect();
+      var cx = r.left + r.width * 0.5, cy = r.top + r.height * 0.5;
+      var ang = Math.atan2(cy - aimY, aimX - cx);
+      st.el.style.setProperty('--spec-angle', ang + 'rad');
+      st.el.style.setProperty('--spec-bright', '0.85');
+    }
+  }
+
+  function initDock() {
+    var root = document.querySelector('.dock');
+    if (!root) return;
+    DOCK.root = root;
+    DOCK.items = [].map.call(root.querySelectorAll('[data-dock]'), function (el) {
+      return { el: el, w: 46, h: 46, v: 0, target: 0 };
+    });
+    SPEC.items = [].map.call(document.querySelectorAll('[data-spec]'), function (el) {
+      return { el: el };
+    });
+
+    window.addEventListener('pointermove', function (e) {
+      aimX = e.clientX; aimY = e.clientY; aimSeen = true;
+      DOCK.dirty = SPEC.dirty = true;
+    }, { passive: true });
+
+    measureDock();
+
+    root.addEventListener('click', function(e) {
+      var item = e.target.closest('[data-dock]');
+      if (!item) return;
+      if (!item.classList.contains('dock-mark')) {
+        for (var i = 0; i < DOCK.items.length; i++) DOCK.items[i].el.classList.remove('is-active');
+        item.classList.add('is-active');
+      }
+    });
+  }
+
+  /* ── Stepped Pixel Reveal Portal Animation ──────────────────────────── */
+  function revealPortal(fig) {
+    var img = fig.querySelector('img');
+    var canvasEl = fig.querySelector('.pixel-reveal');
+    if (!img || !canvasEl) return;
+
+    var delay = parseFloat(fig.getAttribute('data-delay')) || 1000;
+    setTimeout(function () {
+      var box = canvasEl.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+      canvasEl.width = box.width; canvasEl.height = box.height;
+      var ctx = canvasEl.getContext('2d');
+      canvasEl.style.opacity = '1';
+
+      var start = performance.now();
+      var dur = 1400;
+      function step(now) {
+        var t = Math.min(1, (now - start) / dur);
+        ctx.clearRect(0, 0, box.width, box.height);
+        var cols = 40, rows = 24;
+        var cellW = box.width / cols, cellH = box.height / rows;
+
+        for (var y = 0; y < rows; y++) {
+          for (var x = 0; x < cols; x++) {
+            var front = (x / cols);
+            if (Math.abs(front - t) < 0.18) {
+              var a = (1 - Math.abs(front - t) / 0.18) * (1 - t * 0.8);
+              ctx.fillStyle = 'rgba(212, 227, 187, ' + (a * 0.7) + ')';
+              ctx.fillRect(x * cellW + 1, y * cellH + 1, cellW - 2, cellH - 2);
+            }
+          }
+        }
+        if (t < 1) requestAnimationFrame(step);
+        else canvasEl.style.opacity = '0';
+      }
+      requestAnimationFrame(step);
+    }, delay);
+  }
+
+  /* ── Three.js 3D Celestial Film Atmospheric Scene ──────────────────── */
+  var renderer, scene, camera, particleMesh, ringGroup;
+
+  function initThreeScene() {
+    var canvas = document.getElementById('scene');
+    if (!canvas || !window.THREE) return;
+
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 3000);
+    camera.position.z = 1000;
+
+    // Drifting Cine-Pollen Particles
+    var count = 900;
+    var geom = new THREE.BufferGeometry();
+    var pos = new Float32Array(count * 3);
+    var scales = new Float32Array(count);
+
+    for (var i = 0; i < count; i++) {
+      pos[i * 3]     = (Math.random() - 0.5) * 2200;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 1200;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 1000;
+      scales[i] = Math.random() * 2 + 1;
+    }
+    geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
+    // Particle texture
+    var canvasDot = document.createElement('canvas');
+    canvasDot.width = canvasDot.height = 32;
+    var ctxDot = canvasDot.getContext('2d');
+    var grad = ctxDot.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(238, 243, 231, 1)');
+    grad.addColorStop(0.4, 'rgba(212, 227, 187, 0.4)');
+    grad.addColorStop(1, 'rgba(212, 227, 187, 0)');
+    ctxDot.fillStyle = grad; ctxDot.fillRect(0, 0, 32, 32);
+
+    var dotTex = new THREE.CanvasTexture(canvasDot);
+    var pMat = new THREE.PointsMaterial({
+      size: 14, map: dotTex, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    particleMesh = new THREE.Points(geom, pMat);
+    scene.add(particleMesh);
+
+    // Procedural Floating Cinema Ribbons / Film Strip Rings
+    ringGroup = new THREE.Group();
+    var torusMat = new THREE.MeshBasicMaterial({
+      color: 0x829668, wireframe: true, transparent: true, opacity: 0.18
+    });
+    var torus = new THREE.Mesh(new THREE.TorusGeometry(320, 48, 16, 80), torusMat);
+    torus.rotation.x = Math.PI / 3;
+    ringGroup.add(torus);
+
+    var torus2 = new THREE.Mesh(new THREE.TorusGeometry(480, 24, 12, 90), new THREE.MeshBasicMaterial({
+      color: 0xd4e3bb, wireframe: true, transparent: true, opacity: 0.10
+    }));
+    torus2.rotation.y = Math.PI / 4;
+    ringGroup.add(torus2);
+
+    ringGroup.position.set(240, -100, -200);
+    scene.add(ringGroup);
+
+    window.addEventListener('resize', function () {
+      if (!renderer || !camera) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  }
+
+  function renderScene() {
+    if (particleMesh) {
+      var p = particleMesh.geometry.attributes.position.array;
+      for (var i = 1; i < p.length; i += 3) {
+        p[i] += 0.35;
+        if (p[i] > 600) p[i] = -600;
+      }
+      particleMesh.geometry.attributes.position.needsUpdate = true;
+      particleMesh.rotation.y += 0.0003;
+    }
+    if (ringGroup) {
+      ringGroup.rotation.z += 0.0008;
+      ringGroup.rotation.x += 0.0005;
+      ringGroup.position.x = 240 + smooth.x * 40;
+      ringGroup.position.y = -100 - smooth.y * 30;
+    }
+    renderer.render(scene, camera);
+  }
+
+  /* ── Init Entry ─────────────────────────────────────────────────────── */
+  function ready() {
+    document.body.classList.add('is-ready');
+    startParallax();
+    initDock();
+    initThreeScene();
+
+    var portals = document.querySelectorAll('.portal');
+    for (var i = 0; i < portals.length; i++) revealPortal(portals[i]);
+
+    setTimeout(function () { document.body.classList.add('intro-done'); }, 2900);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ready);
+  } else {
+    ready();
+  }
+})();
+</script>
+
+<!-- Hybrid Movie Recommendation Engine Logic & Catalog -->
+<script>
+/* ======================================================================
+   CINEMA CATALOG & HYBRID RECOMMENDATION ENGINE
+   Combines SVD Collaborative Filtering Vector Math with Semantic Content Tags
+   ====================================================================== */
+const MOVIES_DATABASE = [
+  {
+    id: "interstellar",
+    title: "Interstellar",
+    year: 2014,
+    director: "Christopher Nolan",
+    genres: ["Sci-Fi", "Adventure", "Drama"],
+    rating: 8.7,
+    duration: "169 min",
+    poster: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "zSWdZVtXT7E",
+    tags: ["space exploration", "time dilation", "black hole", "father-daughter", "hans zimmer score", "human extinction", "existential"],
+    latentVector: [0.95, 0.88, 0.92, 0.40, 0.85], // [Cerebral, Spectacle, Emotional, Dark, Pacing]
+    overview: "When Earth becomes uninhabitable, a team of ex-NASA astronauts travels through a wormhole near Saturn in search of a new sanctuary for mankind."
+  },
+  {
+    id: "inception",
+    title: "Inception",
+    year: 2010,
+    director: "Christopher Nolan",
+    genres: ["Sci-Fi", "Action", "Thriller"],
+    rating: 8.8,
+    duration: "148 min",
+    poster: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "YoHD9XEInc0",
+    tags: ["dream architecture", "subconscious", "heist", "mind-bending", "hans zimmer score", "reality warp", "memory"],
+    latentVector: [0.98, 0.90, 0.72, 0.50, 0.92],
+    overview: "A skilled thief who steals corporate secrets through the use of dream-sharing technology is offered a chance to erase his criminal history via inception."
+  },
+  {
+    id: "bladerunner",
+    title: "Blade Runner 2049",
+    year: 2017,
+    director: "Denis Villeneuve",
+    genres: ["Sci-Fi", "Mystery", "Drama"],
+    rating: 8.0,
+    duration: "164 min",
+    poster: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "gCcx85zbxz4",
+    tags: ["cyberpunk", "replicant", "existential", "roger deakins", "atmospheric", "neo-noir", "solitude"],
+    latentVector: [0.92, 0.96, 0.84, 0.78, 0.65],
+    overview: "Young Blade Runner K's discovery of a long-buried secret leads him to track down former Blade Runner Rick Deckard, missing for thirty years."
+  },
+  {
+    id: "dune2",
+    title: "Dune: Part Two",
+    year: 2024,
+    director: "Denis Villeneuve",
+    genres: ["Sci-Fi", "Adventure", "Drama"],
+    rating: 8.6,
+    duration: "166 min",
+    poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "Way9Dexny3w",
+    tags: ["desert planet", "prophecy", "hans zimmer score", "spectacle", "political intrigue", "alien ecosystem", "epic"],
+    latentVector: [0.89, 0.98, 0.78, 0.75, 0.88],
+    overview: "Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family."
+  },
+  {
+    id: "arrival",
+    title: "Arrival",
+    year: 2016,
+    director: "Denis Villeneuve",
+    genres: ["Sci-Fi", "Drama", "Mystery"],
+    rating: 7.9,
+    duration: "116 min",
+    poster: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "tFMo3UJ4B4g",
+    tags: ["linguistics", "first contact", "non-linear time", "emotional", "max richter", "existential", "contemplative"],
+    latentVector: [0.96, 0.78, 0.94, 0.42, 0.70],
+    overview: "A linguist works with the military to communicate with alien lifeforms after twelve mysterious spacecraft appear around the world."
+  },
+  {
+    id: "parasite",
+    title: "Parasite",
+    year: 2019,
+    director: "Bong Joon-ho",
+    genres: ["Thriller", "Drama", "Comedy"],
+    rating: 8.5,
+    duration: "132 min",
+    poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "5xH0R_4204Q",
+    tags: ["social class", "dark comedy", "architecture", "deception", "palme d'or", "tension", "metaphor"],
+    latentVector: [0.88, 0.70, 0.80, 0.82, 0.90],
+    overview: "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan."
+  },
+  {
+    id: "spirited",
+    title: "Spirited Away",
+    year: 2001,
+    director: "Hayao Miyazaki",
+    genres: ["Animation", "Adventure", "Fantasy"],
+    rating: 8.6,
+    duration: "125 min",
+    poster: "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "ByXuk9QqQkk",
+    tags: ["studio ghibli", "spirit bathhouse", "joe hisaishi", "coming of age", "enchanting", "mythological", "masterpiece"],
+    latentVector: [0.82, 0.94, 0.96, 0.30, 0.75],
+    overview: "During her family's move to the suburbs, a sullen 10-year-old girl wanders into a world ruled by gods, witches, and spirits."
+  },
+  {
+    id: "whiplash",
+    title: "Whiplash",
+    year: 2014,
+    director: "Damien Chazelle",
+    genres: ["Drama", "Music"],
+    rating: 8.5,
+    duration: "106 min",
+    poster: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "7d_jQycdQGo",
+    tags: ["obsession", "jazz drumming", "mentorship", "perfectionism", "relentless pacing", "intensity", "psychological"],
+    latentVector: [0.85, 0.65, 0.88, 0.85, 0.99],
+    overview: "A promising young drummer enrolls at a cut-throat music conservatory where his dreams of greatness are mentored by an instructor who will stop at nothing."
+  },
+  {
+    id: "eeaao",
+    title: "Everything Everywhere All at Once",
+    year: 2022,
+    director: "The Daniels",
+    genres: ["Sci-Fi", "Comedy", "Adventure"],
+    rating: 7.8,
+    duration: "139 min",
+    poster: "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "wxN1T1uxQ2g",
+    tags: ["multiverse", "absurdist", "existential nihilism", "family reconciliation", "visual kineticism", "creative genius"],
+    latentVector: [0.93, 0.95, 0.92, 0.35, 0.95],
+    overview: "A middle-aged Chinese immigrant is swept into an insane adventure in which she alone can save existence by exploring other universes."
+  },
+  {
+    id: "her",
+    title: "Her",
+    year: 2013,
+    director: "Spike Jonze",
+    genres: ["Drama", "Romance", "Sci-Fi"],
+    rating: 8.0,
+    duration: "126 min",
+    poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "6QRvTv_tpw0",
+    tags: ["artificial intelligence", "loneliness", "melancholy", "future city", "pastel aesthetic", "intimate", "connection"],
+    latentVector: [0.90, 0.72, 0.95, 0.35, 0.60],
+    overview: "In a near future, a lonely writer develops an unlikely relationship with an operating system designed to meet his every need."
+  },
+  {
+    id: "matrix",
+    title: "The Matrix",
+    year: 1999,
+    director: "Lana & Lilly Wachowski",
+    genres: ["Sci-Fi", "Action"],
+    rating: 8.7,
+    duration: "136 min",
+    poster: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "vKQi3bBA1y8",
+    tags: ["simulated reality", "cyberpunk", "philosophical", "bullet time", "rebellion", "ai takeover", "green tint"],
+    latentVector: [0.94, 0.92, 0.68, 0.70, 0.94],
+    overview: "When a beautiful stranger leads computer hacker Neo to a forbidding underworld, he discovers the shocking truth: the world is an elaborate simulation."
+  },
+  {
+    id: "oppenheimer",
+    title: "Oppenheimer",
+    year: 2023,
+    director: "Christopher Nolan",
+    genres: ["Biography", "Drama", "History"],
+    rating: 8.9,
+    duration: "180 min",
+    poster: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "uYPbbksJxIg",
+    tags: ["atomic bomb", "moral dilemma", "trinity test", "ludwig göransson", "historical epic", "guilt", "pacing"],
+    latentVector: [0.95, 0.88, 0.86, 0.88, 0.86],
+    overview: "The story of American scientist J. Robert Oppenheimer and his role in the development of the atomic bomb."
+  },
+  {
+    id: "darkknight",
+    title: "The Dark Knight",
+    year: 2008,
+    director: "Christopher Nolan",
+    genres: ["Action", "Crime", "Drama"],
+    rating: 9.0,
+    duration: "152 min",
+    poster: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "EXeTwQWrcwY",
+    tags: ["joker", "chaos vs order", "hans zimmer score", "moral corruption", "neo-noir", "vigilante", "climax"],
+    latentVector: [0.92, 0.94, 0.76, 0.88, 0.96],
+    overview: "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice."
+  },
+  {
+    id: "spiderverse",
+    title: "Spider-Man: Into the Spider-Verse",
+    year: 2018,
+    director: "Bob Persichetti, Peter Ramsey",
+    genres: ["Animation", "Action", "Adventure"],
+    rating: 8.4,
+    duration: "117 min",
+    poster: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "g4Hbz2jLxvQ",
+    tags: ["comic book art", "multiverse", "hip-hop score", "leap of faith", "coming of age", "vibrant visual masterpiece"],
+    latentVector: [0.82, 0.98, 0.90, 0.38, 0.96],
+    overview: "Teen Miles Morales becomes the new Spider-Man and joins other Spider-Heroes from alternate dimensions to stop a threat to all reality."
+  },
+  {
+    id: "mononoke",
+    title: "Princess Mononoke",
+    year: 1997,
+    director: "Hayao Miyazaki",
+    genres: ["Animation", "Adventure", "Fantasy"],
+    rating: 8.4,
+    duration: "134 min",
+    poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "4OiMOHRDs14",
+    tags: ["studio ghibli", "nature vs civilization", "forest spirits", "iron town", "joe hisaishi", "environmental", "mythic"],
+    latentVector: [0.90, 0.92, 0.88, 0.65, 0.82],
+    overview: "On a journey to find the cure for a Tatarigami's curse, Ashitaka finds himself in the middle of a war between the forest gods and Tatara, a mining colony."
+  },
+  {
+    id: "prestige",
+    title: "The Prestige",
+    year: 2006,
+    director: "Christopher Nolan",
+    genres: ["Drama", "Mystery", "Sci-Fi"],
+    rating: 8.5,
+    duration: "130 min",
+    poster: "https://images.unsplash.com/photo-1514306191717-452ec28c7814?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "RLtaA9fFNXU",
+    tags: ["rivalry", "stage magic", "nikola tesla", "sacrifice", "obsession", "plot twist", "non-linear narrative"],
+    latentVector: [0.96, 0.74, 0.78, 0.85, 0.89],
+    overview: "After a tragic accident, two stage magicians in 1890s London engage in a battle to create the ultimate illusion while sacrificing everything they have to outwit each other."
+  },
+  {
+    id: "fightclub",
+    title: "Fight Club",
+    year: 1999,
+    director: "David Fincher",
+    genres: ["Drama", "Thriller"],
+    rating: 8.8,
+    duration: "139 min",
+    poster: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "qtRKdVHc-cE",
+    tags: ["consumerism", "insomnia", "split personality", "anarchism", "david fincher", "anti-establishment", "cult classic"],
+    latentVector: [0.94, 0.72, 0.65, 0.92, 0.93],
+    overview: "An insomniac office worker and a devil-may-care soap maker form an underground fight club that evolves into much more."
+  },
+  {
+    id: "shutterisland",
+    title: "Shutter Island",
+    year: 2010,
+    director: "Martin Scorsese",
+    genres: ["Mystery", "Thriller"],
+    rating: 8.2,
+    duration: "138 min",
+    poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "5iaYLCiq5RM",
+    tags: ["asylum", "paranoia", "psychological horror", "mind games", "trauma", "scorsese", "atmospheric dread"],
+    latentVector: [0.93, 0.76, 0.82, 0.90, 0.84],
+    overview: "In 1954, a U.S. Marshal investigates the disappearance of a murderer who escaped from a hospital for the criminally insane on a desolate island."
+  },
+  {
+    id: "pulpfiction",
+    title: "Pulp Fiction",
+    year: 1994,
+    director: "Quentin Tarantino",
+    genres: ["Crime", "Drama"],
+    rating: 8.9,
+    duration: "154 min",
+    poster: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "s7EdQ4FqbhY",
+    tags: ["non-linear timeline", "iconic dialogue", "dark humor", "hitmen", "redemption", "tarantino", "pop culture"],
+    latentVector: [0.86, 0.68, 0.70, 0.82, 0.95],
+    overview: "The lives of two mob hitmen, a boxer, a gangster and his wife, and a pair of diner bandits intertwine in four tales of violence and redemption."
+  },
+  {
+    id: "eternalsunshine",
+    title: "Eternal Sunshine of the Spotless Mind",
+    year: 2004,
+    director: "Michel Gondry",
+    genres: ["Drama", "Romance", "Sci-Fi"],
+    rating: 8.3,
+    duration: "108 min",
+    poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "0zFywiAh7N0",
+    tags: ["memory erasure", "heartbreak", "subconscious dreamscapes", "charlie kaufman", "bittersweet", "melancholy"],
+    latentVector: [0.95, 0.70, 0.98, 0.45, 0.72],
+    overview: "When their relationship turns sour, a couple undergoes a medical procedure to have each other erased from their memories."
+  },
+  {
+    id: "exmachina",
+    title: "Ex Machina",
+    year: 2014,
+    director: "Alex Garland",
+    genres: ["Sci-Fi", "Drama", "Thriller"],
+    rating: 7.7,
+    duration: "108 min",
+    poster: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "EoQuVnKhxaM",
+    tags: ["artificial intelligence", "turing test", "manipulation", "claustrophobic", "synthetic consciousness", "femme fatale"],
+    latentVector: [0.95, 0.72, 0.76, 0.82, 0.74],
+    overview: "A programmer at an internet-search giant is selected to participate in a breakthrough experiment in synthetic intelligence by evaluating an android."
+  },
+  {
+    id: "grandbudapest",
+    title: "The Grand Budapest Hotel",
+    year: 2014,
+    director: "Wes Anderson",
+    genres: ["Adventure", "Comedy", "Drama"],
+    rating: 8.1,
+    duration: "99 min",
+    poster: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "1Fg5iWmQjwk",
+    tags: ["pastel symmetry", "whimsical caper", "nostalgia", "confectionery art", "alexandre desplat", "frame stories"],
+    latentVector: [0.84, 0.86, 0.82, 0.25, 0.88],
+    overview: "A writer encounters the owner of an aging high-class hotel, who tells him of his early years serving as a lobby boy in the hotel's glorious years."
+  },
+  {
+    id: "drive",
+    title: "Drive",
+    year: 2011,
+    director: "Nicolas Winding Refn",
+    genres: ["Action", "Drama", "Crime"],
+    rating: 7.8,
+    duration: "100 min",
+    poster: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "KBiOF3y1W0Y",
+    tags: ["synthwave", "neo-noir", "silent protagonist", "stylized violence", "cliff martinez", "los angeles night"],
+    latentVector: [0.80, 0.84, 0.75, 0.88, 0.72],
+    overview: "A mysterious Hollywood action film stuntman who moonlights as a getaway driver finds himself in trouble when he helps out his neighbor."
+  },
+  {
+    id: "madmax",
+    title: "Mad Max: Fury Road",
+    year: 2015,
+    director: "George Miller",
+    genres: ["Action", "Adventure", "Sci-Fi"],
+    rating: 8.1,
+    duration: "120 min",
+    poster: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "hEJnMQG9ev8",
+    tags: ["practical stunts", "post-apocalyptic", "relentless momentum", "feminist action", "visual symphony", "desert wasteland"],
+    latentVector: [0.75, 0.99, 0.70, 0.70, 1.00],
+    overview: "In a post-apocalyptic wasteland, a woman rebels against a tyrannical ruler in search for her homeland with the aid of a group of female prisoners and a drifter named Max."
+  },
+  {
+    id: "nocountry",
+    title: "No Country for Old Men",
+    year: 2007,
+    director: "Joel & Ethan Coen",
+    genres: ["Crime", "Drama", "Thriller"],
+    rating: 8.2,
+    duration: "122 min",
+    poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "38A__WT3-o0",
+    tags: ["existential dread", "anton chigurh", "cormac mccarthy", "texas border", "unforgiving fate", "no musical score"],
+    latentVector: [0.93, 0.65, 0.68, 0.98, 0.80],
+    overview: "Violence and mayhem ensue after a hunter stumbles upon a drug deal gone wrong and more than two million dollars in cash near the Rio Grande."
+  },
+  {
+    id: "spaceodyssey",
+    title: "2001: A Space Odyssey",
+    year: 1968,
+    director: "Stanley Kubrick",
+    genres: ["Sci-Fi", "Adventure"],
+    rating: 8.3,
+    duration: "149 min",
+    poster: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "oR_e9y-bka0",
+    tags: ["monolith", "hal 9000", "human evolution", "classical music", "philosophical masterpiece", "cosmic awe"],
+    latentVector: [0.99, 0.92, 0.55, 0.60, 0.50],
+    overview: "After discovering a mysterious artifact buried beneath the Lunar surface, mankind sets off on a quest to find its origins with help from intelligent supercomputer H.A.L. 9000."
+  },
+  {
+    id: "solaris",
+    title: "Solaris",
+    year: 1972,
+    director: "Andrei Tarkovsky",
+    genres: ["Sci-Fi", "Drama", "Mystery"],
+    rating: 8.0,
+    duration: "167 min",
+    poster: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "6-4KydP92ss",
+    tags: ["sentient ocean", "memory grief", "philosophical sci-fi", "tarkovsky", "poetic cinema", "psychological resonance"],
+    latentVector: [0.98, 0.70, 0.92, 0.65, 0.45],
+    overview: "A psychologist is sent to a space station orbiting a mysterious planet in order to learn what has caused the crew to go insane."
+  },
+  {
+    id: "stalker",
+    title: "Stalker",
+    year: 1979,
+    director: "Andrei Tarkovsky",
+    genres: ["Sci-Fi", "Drama"],
+    rating: 8.1,
+    duration: "162 min",
+    poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "Q3hL9vWV1b4",
+    tags: ["the zone", "innermost desires", "existential pilgrimage", "sepia to color", "philosophical fable", "spiritual meditation"],
+    latentVector: [0.99, 0.68, 0.90, 0.75, 0.40],
+    overview: "A guide leads two men through an area known as the Zone to find a room that grants a person's most innermost desires."
+  },
+  {
+    id: "lighthouse",
+    title: "The Lighthouse",
+    year: 2019,
+    director: "Robert Eggers",
+    genres: ["Drama", "Fantasy", "Horror"],
+    rating: 7.4,
+    duration: "109 min",
+    poster: "https://images.unsplash.com/photo-1514306191717-452ec28c7814?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "Hyag7lR8CPA",
+    tags: ["black and white", "mythology", "insanity", "isolation", "mermaids", "robert eggers", "atmospheric fever dream"],
+    latentVector: [0.91, 0.78, 0.72, 0.96, 0.75],
+    overview: "Two lighthouse keepers try to maintain their sanity while living on a remote and mysterious New England island in the 1890s."
+  },
+  {
+    id: "portrait",
+    title: "Portrait of a Lady on Fire",
+    year: 2019,
+    director: "Céline Sciamma",
+    genres: ["Drama", "Romance", "History"],
+    rating: 8.1,
+    duration: "122 min",
+    poster: "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "R-fQPT4xm7k",
+    tags: ["female gaze", "poetic intimacy", "breton coast", "orpheus myth", "masterpiece of painting", "unspoken love"],
+    latentVector: [0.92, 0.70, 0.99, 0.30, 0.60],
+    overview: "On an isolated island in Brittany at the end of the eighteenth century, a female painter is obliged to paint a wedding portrait of a young woman."
+  },
+  {
+    id: "yourname",
+    title: "Your Name (Kimi no Na wa)",
+    year: 2016,
+    director: "Makoto Shinkai",
+    genres: ["Animation", "Drama", "Fantasy"],
+    rating: 8.4,
+    duration: "106 min",
+    poster: "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "xU47nhruN-Q",
+    tags: ["body swap", "comet catastrophe", "time distortion", "emotional catharsis", "makoto shinkai", "radwimps score"],
+    latentVector: [0.86, 0.95, 0.98, 0.32, 0.92],
+    overview: "Two teenagers share a profound, magical connection upon discovering they are swapping bodies. Things become complicated when the boy and girl decide to meet in person."
+  },
+  {
+    id: "memoriesofmurder",
+    title: "Memories of Murder",
+    year: 2003,
+    director: "Bong Joon-ho",
+    genres: ["Crime", "Drama", "Mystery"],
+    rating: 8.1,
+    duration: "132 min",
+    poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "dT6d_7e45Zg",
+    tags: ["rural serial killer", "unsolved case", "rainy nights", "bong joon-ho", "korean cinema masterclass", "tragic realism"],
+    latentVector: [0.91, 0.68, 0.85, 0.91, 0.88],
+    overview: "In 1986, in a rural province, two detectives struggle with the case of multiple young women being found raped and murdered by an unknown culprit."
+  },
+  {
+    id: "trumanshow",
+    title: "The Truman Show",
+    year: 1998,
+    director: "Peter Weir",
+    genres: ["Comedy", "Drama", "Sci-Fi"],
+    rating: 8.2,
+    duration: "103 min",
+    poster: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "dlnmQbPGuls",
+    tags: ["reality television", "constructed reality", "existential awakening", "jim carrey", "satirical genius", "free will"],
+    latentVector: [0.92, 0.75, 0.88, 0.38, 0.88],
+    overview: "An insurance salesman discovers his entire life is actually a reality TV show broadcast across the globe."
+  },
+  {
+    id: "childrenofmen",
+    title: "Children of Men",
+    year: 2006,
+    director: "Alfonso Cuarón",
+    genres: ["Action", "Drama", "Sci-Fi"],
+    rating: 7.9,
+    duration: "109 min",
+    poster: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "2VT2apoX9dg",
+    tags: ["human infertility", "one-shot camera takes", "dystopian london", "clive owen", "miracle of birth", "bleak hope"],
+    latentVector: [0.93, 0.88, 0.90, 0.89, 0.91],
+    overview: "In 2027, in a chaotic world in which women have become mysteriously infertile, a former activist agrees to help transport a miraculously pregnant woman to a sanctuary."
+  },
+  {
+    id: "se7en",
+    title: "Se7en",
+    year: 1995,
+    director: "David Fincher",
+    genres: ["Crime", "Drama", "Mystery"],
+    rating: 8.6,
+    duration: "127 min",
+    poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "znmZoVkCjpI",
+    tags: ["seven deadly sins", "constant rain", "david fincher", "what's in the box", "grim morality", "nihilistic masterpiece"],
+    latentVector: [0.90, 0.65, 0.75, 0.99, 0.92],
+    overview: "Two detectives, a rookie and a veteran, hunt a serial killer who uses the seven deadly sins as his motives."
+  },
+  {
+    id: "dune1",
+    title: "Dune",
+    year: 2021,
+    director: "Denis Villeneuve",
+    genres: ["Sci-Fi", "Adventure", "Drama"],
+    rating: 8.0,
+    duration: "155 min",
+    poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop",
+    youtubeId: "n9xhJrPXop4",
+    tags: ["arrakis", "spice", "sandworms", "greg fraser cinematography", "hans zimmer score", "palace betrayal", "monumental"],
+    latentVector: [0.88, 0.96, 0.74, 0.72, 0.78],
+    overview: "A noble family becomes embroiled in a war for control over the galaxy's most valuable asset while its heir becomes troubled by visions of a dark future."
+  }
+];
+
+// State
+let currentAnchorId = "interstellar";
+let currentAlpha = 0.50; // 0 = 100% Content, 1 = 100% Collaborative
+let currentPersona = "scifi";
+let currentGenre = "All";
+let watchlist = JSON.parse(localStorage.getItem('sylva_cinema_watchlist') || '[]');
+let userRatings = JSON.parse(localStorage.getItem('sylva_cinema_ratings') || '{}');
+let activeModalMovie = null;
+
+// Cosine similarity between two vectors
+function cosineSimilarity(vecA, vecB) {
+  let dotProduct = 0, normA = 0, normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
+}
+
+// Content-Based score based on shared tags & genre overlap
+function computeContentScore(movieA, movieB) {
+  let sharedTags = 0;
+  movieA.tags.forEach(t => {
+    if (movieB.tags.includes(t)) sharedTags++;
+  });
+  let tagSim = sharedTags / Math.max(1, Math.min(movieA.tags.length, movieB.tags.length));
+
+  let sharedGenres = 0;
+  movieA.genres.forEach(g => {
+    if (movieB.genres.includes(g)) sharedGenres++;
+  });
+  let genreSim = sharedGenres / Math.max(1, Math.min(movieA.genres.length, movieB.genres.length));
+
+  let directorBonus = movieA.director === movieB.director ? 0.25 : 0;
+  return Math.min(1.0, tagSim * 0.55 + genreSim * 0.35 + directorBonus);
+}
+
+// Collaborative Filtering score based on latent space SVD factors + user rating profile
+function computeCollaborativeScore(movieA, movieB) {
+  let vectorSim = cosineSimilarity(movieA.latentVector, movieB.latentVector);
+  
+  // If user has rated this movie or similar movies, boost collaborative fidelity
+  if (userRatings[movieB.id]) {
+    let ratingBonus = (userRatings[movieB.id] - 3) * 0.08;
+    vectorSim = Math.min(1.0, Math.max(0, vectorSim + ratingBonus));
+  }
+  return vectorSim;
+}
+
+// Generate reasons
+function generateRecommendationReason(anchor, target) {
+  let sharedTags = anchor.tags.filter(t => target.tags.includes(t));
+  if (anchor.director === target.director) {
+    return `Shares ${anchor.director}'s signature directorial style, complex non-linear tension, and visual grandeur.`;
+  }
+  if (sharedTags.length > 0) {
+    return `High thematic resonance in ${sharedTags.slice(0, 2).join(' & ')} with ${Math.round(cosineSimilarity(anchor.latentVector, target.latentVector) * 100)}% latent aesthetic alignment.`;
+  }
+  return `Strong algorithmic overlap in pacing, narrative intensity, and critical rating consensus.`;
+}
+
+// Main hybrid calculation
+function getRecommendations() {
+  const anchor = MOVIES_DATABASE.find(m => m.id === currentAnchorId) || MOVIES_DATABASE[0];
+  let candidates = MOVIES_DATABASE.filter(m => m.id !== anchor.id);
+
+  if (currentGenre !== "All") {
+    candidates = candidates.filter(m => m.genres.includes(currentGenre));
+  }
+
+  const scored = candidates.map(movie => {
+    const cfScore = computeCollaborativeScore(anchor, movie);
+    const cbScore = computeContentScore(anchor, movie);
+    const hybridScore = (currentAlpha * cfScore) + ((1 - currentAlpha) * cbScore);
+
+    return {
+      movie: movie,
+      cfScore: cfScore,
+      cbScore: cbScore,
+      matchPct: Math.round(hybridScore * 100),
+      cfPct: Math.round(cfScore * 100),
+      cbPct: Math.round(cbScore * 100),
+      reason: generateRecommendationReason(anchor, movie)
+    };
+  });
+
+  scored.sort((a, b) => b.matchPct - a.matchPct);
+  return scored;
+}
+
+function filterByGenre(genre, btnElement) {
+  currentGenre = genre;
+  document.querySelectorAll('.genre-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btnElement) btnElement.classList.add('active');
+  renderRecommendations();
+}
+
+// Render recommendations
+function renderRecommendations() {
+  const container = document.getElementById('movie-cards-container');
+  if (!container) return;
+
+  const recs = getRecommendations();
+  container.innerHTML = '';
+
+  const countEl = document.getElementById('recs-count-display');
+  if (countEl) {
+    countEl.textContent = `Displaying ${recs.length} ${currentGenre === 'All' ? 'hybrid' : currentGenre} recommendations`;
+  }
+
+  recs.forEach(item => {
+    const m = item.movie;
+    const isSaved = watchlist.some(w => w.id === m.id);
+    const userRating = userRatings[m.id] || 0;
+
+    const card = document.createElement('article');
+    card.className = 'movie-card';
+    card.innerHTML = `
+      <div class="movie-poster-wrap" onclick="openTrailerModal('${m.id}')">
+        <span class="movie-badge-score">★ ${m.rating} • ${item.matchPct}% Match</span>
+        <img src="${m.poster}" alt="${m.title} poster" loading="lazy">
+        <div class="movie-play-overlay">
+          <button class="play-icon-btn" aria-label="Play trailer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="movie-content">
+        <div class="movie-meta-top">
+          <span>${m.year} • ${m.duration}</span>
+          <span>${m.genres[0]}</span>
+        </div>
+        <h3 class="movie-title" onclick="openTrailerModal('${m.id}')">${m.title}</h3>
+        <p class="movie-reason">${item.reason}</p>
+        
+        <div class="movie-breakdown-bar">
+          <div class="breakdown-row">
+            <span>Collaborative Fit: <strong>${item.cfPct}%</strong></span>
+            <span>Content Sim: <strong>${item.cbPct}%</strong></span>
+          </div>
+          <div class="breakdown-meter">
+            <div class="breakdown-fill fill-cf" style="width:${item.matchPct}%"></div>
+          </div>
+        </div>
+
+        <div class="movie-card-footer">
+          <div class="rate-stars" title="Rate this film to tune your collaborative model">
+            ${[1, 2, 3, 4, 5].map(star => `
+              <svg class="${star <= userRating ? 'active' : ''}" onclick="rateFilm('${m.id}', ${star})" viewBox="0 0 24 24">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            `).join('')}
+          </div>
+          <button class="btn-watchlist-add ${isSaved ? 'saved' : ''}" onclick="toggleWatchlistMovie('${m.id}', this)">
+            ${isSaved ? '✓ Saved' : '+ Watchlist'}
+          </button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// Set new Anchor Film
+function setAnchor(id) {
+  const m = MOVIES_DATABASE.find(item => item.id === id);
+  if (!m) return;
+  currentAnchorId = id;
+  document.getElementById('anchor-title-display').textContent = `${m.title} (${m.year})`;
+
+  // Update hero quick button states
+  document.querySelectorAll('.persona-btn').forEach(btn => {
+    if (btn.textContent.toLowerCase().includes(m.title.toLowerCase())) {
+      btn.classList.add('active');
+    }
+  });
+
+  renderRecommendations();
+  showToast(`Anchor film updated to: ${m.title}`);
+}
+
+// Update Algorithm Weights
+function updateWeights(val) {
+  currentAlpha = val / 100;
+  const cfPct = Math.round(currentAlpha * 100);
+  const cbPct = 100 - cfPct;
+  document.getElementById('alpha-val').textContent = `${cfPct}% Collaborative / ${cbPct}% Content`;
+  document.getElementById('formula-text').textContent =
+    `Score = ${(currentAlpha).toFixed(2)} · CF(User, Item) + ${(1 - currentAlpha).toFixed(2)} · CosineSim(Tags, Item)`;
+  renderRecommendations();
+}
+
+// Set Persona Preset
+function setPersona(persona) {
+  currentPersona = persona;
+  document.querySelectorAll('.persona-list .persona-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (persona === 'scifi') {
+    setAnchor('interstellar');
+    updateWeights(65);
+    document.getElementById('weight-slider').value = 65;
+  } else if (persona === 'auteur') {
+    setAnchor('parasite');
+    updateWeights(40);
+    document.getElementById('weight-slider').value = 40;
+  } else if (persona === 'thriller') {
+    setAnchor('whiplash');
+    updateWeights(50);
+    document.getElementById('weight-slider').value = 50;
+  } else if (persona === 'animation') {
+    setAnchor('spirited');
+    updateWeights(30);
+    document.getElementById('weight-slider').value = 30;
+  }
+}
+
+// Rate Film (dynamically trains the collaborative filter)
+function rateFilm(id, stars) {
+  userRatings[id] = stars;
+  localStorage.setItem('sylva_cinema_ratings', JSON.stringify(userRatings));
+  renderRecommendations();
+  showToast(`★ ${stars}-star rating recorded. Collaborative embeddings refined!`);
+}
+
+// Watchlist functionality
+function toggleWatchlistMovie(id, btnElement) {
+  const movie = MOVIES_DATABASE.find(m => m.id === id);
+  if (!movie) return;
+
+  const idx = watchlist.findIndex(w => w.id === id);
+  if (idx > -1) {
+    watchlist.splice(idx, 1);
+    if (btnElement) {
+      btnElement.classList.remove('saved');
+      btnElement.textContent = '+ Watchlist';
+    }
+    showToast(`Removed "${movie.title}" from Watchlist`);
+  } else {
+    watchlist.push(movie);
+    if (btnElement) {
+      btnElement.classList.add('saved');
+      btnElement.textContent = '✓ Saved';
+    }
+    showToast(`Saved "${movie.title}" to Watchlist`);
+  }
+  localStorage.setItem('sylva_cinema_watchlist', JSON.stringify(watchlist));
+  updateWatchlistBadge();
+  renderWatchlistDrawer();
+}
+
+function updateWatchlistBadge() {
+  const badge = document.getElementById('watchlist-count');
+  if (badge) badge.textContent = watchlist.length;
+}
+
+function toggleWatchlist(open) {
+  const drawer = document.getElementById('watchlist-drawer');
+  if (!drawer) return;
+  if (open === undefined) drawer.classList.toggle('open');
+  else drawer.classList.toggle('open', open);
+  if (drawer.classList.contains('open')) renderWatchlistDrawer();
+}
+
+function renderWatchlistDrawer() {
+  const list = document.getElementById('drawer-items-list');
+  if (!list) return;
+  if (watchlist.length === 0) {
+    list.innerHTML = `<div class="drawer-empty"><p>Your curated watchlist is empty.</p><span style="font-size:12px; margin-top:8px; display:block;">Click "+ Watchlist" on any film to save it.</span></div>`;
+    return;
+  }
+  list.innerHTML = '';
+  watchlist.forEach(m => {
+    const item = document.createElement('div');
+    item.className = 'drawer-item';
+    item.innerHTML = `
+      <img src="${m.poster}" alt="${m.title}">
+      <div class="drawer-item-info">
+        <h4 class="drawer-item-title">${m.title}</h4>
+        <span class="drawer-item-genre">${m.year} • ${m.genres[0]}</span>
+        <button style="background:none; border:none; color:var(--gold-leaf); font-size:12px; cursor:pointer; text-align:left; padding:0;" onclick="openTrailerModal('${m.id}')">Watch Trailer →</button>
+      </div>
+      <button class="drawer-del-btn" onclick="toggleWatchlistMovie('${m.id}')" title="Remove film">✕</button>
+    `;
+    list.appendChild(item);
+  });
+}
+
+// Trailer Modal
+function openTrailerModal(id) {
+  const m = MOVIES_DATABASE.find(item => item.id === id);
+  if (!m) return;
+  activeModalMovie = m;
+
+  const modal = document.getElementById('trailer-modal');
+  const iframe = document.getElementById('trailer-iframe');
+  const title = document.getElementById('modal-film-title');
+  const meta = document.getElementById('modal-film-meta');
+  const desc = document.getElementById('modal-film-desc');
+  const btnWatchlist = document.getElementById('modal-btn-watchlist');
+
+  title.textContent = m.title;
+  desc.textContent = m.overview;
+  meta.innerHTML = `
+    <span class="modal-meta-pill">★ ${m.rating}</span>
+    <span class="modal-meta-pill">${m.year}</span>
+    <span class="modal-meta-pill">${m.duration}</span>
+    <span class="modal-meta-pill">Dir: ${m.director}</span>
+    <span>${m.genres.join(', ')}</span>
+  `;
+
+  const isSaved = watchlist.some(w => w.id === m.id);
+  btnWatchlist.textContent = isSaved ? '✓ In Watchlist' : '+ Add to Watchlist';
+  btnWatchlist.className = 'btn-watchlist-add ' + (isSaved ? 'saved' : '');
+
+  iframe.src = `https://www.youtube.com/embed/${m.youtubeId}?autoplay=1&rel=0`;
+  modal.classList.add('active');
+}
+
+function closeTrailerModal() {
+  const modal = document.getElementById('trailer-modal');
+  const iframe = document.getElementById('trailer-iframe');
+  if (iframe) iframe.src = "";
+  if (modal) modal.classList.remove('active');
+}
+
+function toggleModalWatchlist() {
+  if (!activeModalMovie) return;
+  toggleWatchlistMovie(activeModalMovie.id, document.getElementById('modal-btn-watchlist'));
+}
+
+function setAnchorFromModal() {
+  if (!activeModalMovie) return;
+  setAnchor(activeModalMovie.id);
+  closeTrailerModal();
+  document.getElementById('recommendations').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Habitat quick filter
+function filterByHabitat(habitat) {
+  if (habitat === 'cosmos') setAnchor('interstellar');
+  else if (habitat === 'neon') setAnchor('bladerunner');
+  else if (habitat === 'ghibli') setAnchor('spirited');
+  document.getElementById('recommendations').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Toast Notification
+let toastTimer = null;
+function showToast(text) {
+  const toast = document.getElementById('toast-msg');
+  const toastText = document.getElementById('toast-text');
+  if (!toast || !toastText) return;
+  toastText.textContent = text;
+  toast.classList.add('active');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove('active');
+  }, 2800);
+}
+
+// Search filter
+document.getElementById('movie-search').addEventListener('input', function(e) {
+  const query = e.target.value.toLowerCase().trim();
+  if (!query) {
+    renderRecommendations();
+    return;
+  }
+  const match = MOVIES_DATABASE.find(m => m.title.toLowerCase().includes(query));
+  if (match && match.id !== currentAnchorId) {
+    setAnchor(match.id);
+  }
+});
+
+// Watchlist dock toggle
+document.getElementById('dock-watchlist-btn').addEventListener('click', function(e) {
+  e.preventDefault();
+  toggleWatchlist(true);
+});
+
+// Initial boot
+renderRecommendations();
+updateWatchlistBadge();
+</script>
+
+</body>
+</html>
